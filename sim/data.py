@@ -16,10 +16,9 @@ DATA = Path(__file__).resolve().parent.parent / "data"
 
 STATS = ("damage", "heal", "shield", "poison", "burn", "shock")
 
-# Trainer HP per day, read from the HP bar (docs/step2-screen-map.md; days 9 to 13 from the
-# older Kayloe1/batomon notes, build 25448953).
-DAY_HP = {1: 300, 2: 500, 3: 800, 4: 1400, 5: 2400, 6: 3800, 7: 5700, 8: 8300,
-          9: 11600, 10: 17300, 11: 24900, 12: 34700, 13: 47300}
+# Trainer HP per day, read from the HP bar in the 2026-11-11 runs (docs/step2-screen-map.md).
+# Days 9+ have not been seen since the game's updates: pass "hp" explicitly for them.
+DAY_HP = {1: 300, 2: 500, 3: 800, 4: 1400, 5: 2400, 6: 3800, 7: 5700, 8: 8300}
 
 # Units that are not in the Batopedia CSVs. GUESS: the Dragon Egg (event reward) was seen dealing
 # 1 damage and triggering once in a ~19 s battle, so its cooldown is somewhere in 9.5-19 s.

@@ -46,8 +46,8 @@ mine = team_from_reader(reader.read_state(image))   # shop screen -> team
   level, so buffs bought in the shop are included. Without it, the level's Batopedia numbers are used, and
   badge-type trinket and trainer bonuses (Wood Sword, Chef, Chemist...) are added.
 - Optional per slot: `multicast`, `cooldown`, `speed` (% cooldown speed), `protect`.
-- `hp` is the trainer's HP; or give `"day": 3` to use the day table (300, 500, 800, 1400, 2400, 3800, 5700,
-  8300, 11600, 17300, 24900, 34700, 47300).
+- `hp` is the trainer's HP; or give `"day": 3` to use the day table for days 1-8 (300, 500, 800, 1400,
+  2400, 3800, 5700, 8300, seen in the 2026-11-11 runs). For later days pass `hp`.
 - `coffee: true` means a Coffee was used before this battle.
 
 ## How a battle runs
@@ -75,12 +75,19 @@ Two battles are recorded well enough to check (cases in `sim/cases/`, from the R
 
 **Verified by those battles:** first cast after a full cooldown; Poison = stacks once a second on the battle
 clock with no decay; Shock = flat +stacks on every hit with no decay (percent Shock would leave the opponent
-at 345, not 124); adjacency is orthogonal (the opponent's diagonal Venopuff got no Noxnimbus bonus);
+at 345, not 124); no diagonal adjacency (the opponent's diagonal Venopuff got no Noxnimbus bonus);
 Noxnimbus buffs neighbours, not itself; Mosslug hits first, then gains; Stats 'Dealt' excludes ticks;
 Stats 'Healed' counts the full heal.
 
-**From the game's own keyword text** (copied in the older Kayloe1/batomon notes): Burn twice a second and
--1 per tick; status damage 15% less against shields; Knockout and Protect; Charge; behind/front/above.
+**Unverified, from the September notes** (the old Kayloe1/batomon repo copied the game's keyword tooltips;
+the game has been updated since, so these hard numbers are not trusted until a recorded battle checks them):
+- Burn ticks twice a second and loses 1 stack per tick. No recorded battle has Burn.
+- Status damage is 15% lower against a shield. No recorded battle has a shield.
+- Protect blocks one Knockout and drops by 1.
+- Above/below count as adjacent (diagonals are ruled out by Day 3; above/below is not checked).
+They are marked `old-notes` in `python -m sim --rules`, and the numbers live in `SETTINGS` in
+`sim/rules.py`, so they can be changed in one place. Wording-only definitions (behind = left, in front =
+right, Charge moves the timer, Knockout disables abilities) are also from those notes.
 
 **Guessed** (each one is listed with its reason by `python -m sim --rules`):
 - Cooldown Speed formula (divide by 1 + X%).

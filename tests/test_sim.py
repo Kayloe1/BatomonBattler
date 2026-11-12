@@ -89,6 +89,7 @@ class Mechanics(unittest.TestCase):
         self.assertEqual(r.hp[1], 1000 - 12)
 
     def test_burn_ticks_twice_a_second_and_decays(self):
+        # Checks the code against an UNVERIFIED rule from the September notes (see sim/rules.py).
         r = simulate(team([mon("Pyronade")]), EMPTY, until=6.0)
         # Burn 20 at 4.5 s; ticks at 4.5 (right after the cast), 5.0, 5.5, 6.0 deal 20, 19, 18, 17.
         self.assertEqual(r.hp[1], 1000 - 74)
@@ -100,6 +101,7 @@ class Mechanics(unittest.TestCase):
         self.assertEqual(r.statuses[1]["shock"], 25)
 
     def test_shield_blocks_damage_and_status_is_reduced(self):
+        # The 15% status reduction is an UNVERIFIED number from the September notes.
         # Both cast at 5 s, player first: Shield 20, then the 25 hit takes it and 5 HP.
         r = simulate(team([mon("Pebbler")]), team([mon("Panbud")]), until=5.0)
         self.assertEqual(r.hp[0], 995)
