@@ -1,0 +1,177 @@
+{
+ "screen": "shop",
+ "lives": 1,
+ "day": 7,
+ "badges": 1,
+ "badges_goal": 10,
+ "trainer": "Monster Ranger",
+ "trainer_hp": 7125,
+ "money": 290,
+ "shop_rank": 7,
+ "shop_odds": {
+  "Common": 30,
+  "Uncommon": 40,
+  "Rare": 25,
+  "Super Rare": 5,
+  "Legendary": 0
+ },
+ "reroll_price": 3,
+ "locked": false,
+ "shop": [
+  {
+   "name": "Cherubble",
+   "price": 25,
+   "kind": "monster",
+   "stats": [
+    {
+     "value": 100,
+     "raw": "100",
+     "stat": "shield",
+     "color": "#b8d0e8"
+    }
+   ],
+   "rarity": "Rare",
+   "greyed": false,
+   "raw": "Cherubble"
+  },
+  {
+   "name": "Pyronade",
+   "price": 25,
+   "kind": "monster",
+   "stats": [
+    {
+     "value": 25,
+     "raw": "25",
+     "stat": "burn",
+     "color": "#ef7318"
+    }
+   ],
+   "rarity": "Uncommon",
+   "greyed": false,
+   "raw": "Pyronade"
+  },
+  {
+   "name": "Runerock",
+   "price": 20,
+   "kind": "monster",
+   "stats": [
+    {
+     "value": 140,
+     "raw": "140",
+     "stat": "shield",
+     "color": "#b8d0e8"
+    }
+   ],
+   "rarity": "Uncommon",
+   "greyed": false,
+   "raw": "Runerock"
+  },
+  {
+   "name": "Magmite",
+   "price": 15,
+   "kind": "monster",
+   "stats": [
+    {
+     "value": 40,
+     "raw": "40",
+     "stat": "shield",
+     "color": "#b8d0e8"
+    },
+    {
+     "value": 9,
+     "raw": "9",
+     "stat": "burn",
+     "color": "#ff9c31"
+    }
+   ],
+   "rarity": "Common",
+   "greyed": false,
+   "raw": "Magmite"
+  },
+  {
+   "name": "Gray Chip",
+   "price": 0,
+   "kind": "item",
+   "stats": [],
+   "rarity": "Common",
+   "greyed": false,
+   "raw": "Gray Chip"
+  }
+ ],
+ "team": [
+  {
+   "name": "Magmite",
+   "level": 1,
+   "stats": [
+    {
+     "value": 40,
+     "raw": "40",
+     "stat": "shield",
+     "color": "#b8d0e8"
+    },
+    {
+     "value": 9,
+     "raw": "9",
+     "stat": "burn",
+     "color": "#ff9c31"
+    }
+   ]
+  },
+  {
+   "name": "Noxnimbus",
+   "level": 1,
+   "stats": [
+    {
+     "value": 1,
+     "raw": "1",
+     "stat": "poison",
+     "color": "#845abd"
+    }
+   ]
+  },
+  null,
+  {
+   "name": "Pebbler",
+   "level": 1,
+   "stats": [
+    {
+     "value": 20,
+     "raw": "20",
+     "stat": "shield",
+     "color": "#b8d0e8"
+    }
+   ]
+  },
+  {
+   "name": "Runerock",
+   "level": 1,
+   "stats": [
+    {
+     "value": 140,
+     "raw": "140",
+     "stat": "shield",
+     "color": "#b8d0e8"
+    }
+   ]
+  },
+  {
+   "name": "Electranade",
+   "level": 3,
+   "stats": [
+    {
+     "value": 75,
+     "raw": "75",
+     "stat": "shock",
+     "color": "#ffce00"
+    }
+   ]
+  }
+ ],
+ "bench": [
+  null,
+  null,
+  null,
+  null
+ ],
+ "problems": []
+}

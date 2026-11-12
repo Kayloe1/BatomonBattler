@@ -676,7 +676,10 @@ def read_shop(pic: np.ndarray) -> dict:
     else:
         state["shop_odds"] = dict(zip(RARITIES, values))
 
-    state["reroll_price"] = number("reroll", "$")
+    if text("reroll").startswith("FREE"):     # trainers with free rerolls: "FREE (3)"
+        state["reroll_price"] = 0
+    else:
+        state["reroll_price"] = number("reroll", "$")
     # The button says LOCK (label 92 px wide) or, when the shop is locked, UNLOCK (138 px).
     label = glyphs.white(crop(pic, LOCK_BUTTON)).any(axis=0)
     cols = np.nonzero(label)[0]

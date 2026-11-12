@@ -130,6 +130,30 @@ LESSONS = [
         "file": "captures/shop_r2_day7.png",
         "team": {5: ("Electranade", "3", "75")},
     },
+    {   # Youngster day 1: "REROLL FREE (3)" (3 free rerolls a day) and a $0 Cake on a grey card
+        "file": "captures/shop_day1_youngster_free_reroll.png",
+        "text": {"reroll": "FREE(3)", "shop4": "Cake|$0"},
+    },
+    {   # Chef day 5: level 2 Magmite with shield 80 (first "8" in the badge font)
+        "file": "captures/shop_chef_day5_badge8.png",
+        "team": {5: ("Magmite", "2", "8010")},
+    },
+    {   # Chef day 6: shop rank 6 is 54% / 27% / 17% / 3% / 0% (first "7" in the rank bar)
+        "file": "captures/shop_chef_day6_rank6.png",
+        "text": {"rank_bar": "Rank6*54%*27%*17%*3%*0%"},
+    },
+    {   # Chef day 8: shop rank 8 is 38% / 25% / 29% / 8% / 0%
+        "file": "captures/shop_chef_day8_rank8.png",
+        "text": {"rank_bar": "Rank8*38%*25%*29%*8%*0%"},
+    },
+    {   # Chef day 9: trainer HP 11600
+        "file": "captures/shop_chef_day9.png",
+        "text": {"day": "DAY9", "hp": "11600"},
+    },
+    {   # Chef day 10 (first "0" in the title font)
+        "file": "captures/shop_chef_day10.png",
+        "text": {"day": "DAY10"},
+    },
 ]
 
 
