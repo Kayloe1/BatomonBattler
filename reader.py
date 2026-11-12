@@ -112,9 +112,16 @@ SCREENS: dict[str, list[tuple[int, int, tuple[int, int, int]]]] = {
                      (100, 1215, (14, 14, 14))],
     # "This journey ends here.": camera (left), New Run and Main Menu (right)
     "run_over": [(60, 1310, (255, 206, 0)), (1300, 1300, RED), (1900, 1300, RED), (1280, 60, (14, 14, 14))],
-    # Main menu: New Run / Batopedia / Settings buttons (red) and the blue Patch Notes / Mobile buttons
-    "main_menu": [(1276, 740, RED), (1276, 893, RED), (1276, 1200, RED), (25, 1118, (21, 157, 216)),
-                  (25, 1238, (21, 157, 216))],
+    # Main menu while a run is open: Continue / New Run / Batopedia / Settings / Quit (five red buttons)
+    "main_menu_continue": [(900, 696, RED), (900, 848, RED), (900, 1000, RED), (900, 1152, RED), (900, 1304, RED),
+                           (25, 1118, (21, 157, 216)), (25, 1238, (21, 157, 216))],
+    # Main menu with no run open: New Run / Batopedia / Settings / Quit (four buttons, lower down).
+    # The rows are different in the two menus, so neither can be taken for the other.
+    "main_menu": [(900, 772, RED), (900, 924, RED), (900, 1076, RED), (900, 1228, RED),
+                  (25, 1118, (21, 157, 216)), (25, 1238, (21, 157, 216))],
+    # Title screen: the logo, the dragon silhouette and the dark "PRESS ANY KEY TO START" label
+    "title": [(768, 240, (237, 103, 250)), (1408, 240, (67, 249, 245)), (1280, 739, (111, 49, 71)),
+              (890, 1045, (55, 55, 55)), (1650, 1045, (55, 55, 55))],
     # "Cash In": a trinket dialog (blue header, white body) with one red button, shop dimmed behind it
     "cash_in": [(1280, 255, (0, 132, 189)), (1280, 560, (255, 255, 255)), (1152, 1020, RED),
                 (1408, 1046, RED), (25, 1315, (22, 22, 23))],
@@ -131,7 +138,9 @@ def fast_forward_on(pic: np.ndarray) -> bool:
 
 # Buttons on the other screens
 RESULT_CONFIRM: Box = BATTLE_BUTTON
-MAIN_MENU_NEW_RUN: Box = (845, 716, 1715, 842)
+TITLE_ANYWHERE: Box = (1180, 1300, 1380, 1400)     # empty sky under the label
+MAIN_MENU_NEW_RUN: Box = (845, 730, 1715, 815)        # only on the four-button menu
+MAIN_MENU_CONTINUE: Box = (845, 654, 1715, 738)       # only on the five-button menu
 CASH_IN_BUTTON: Box = (1088, 989, 1472, 1104)
 RESULT_STATS: Box = (19, 330, 448, 451)
 STATS_CLOSE: Box = (2240, 125, 2310, 200)
@@ -1129,7 +1138,7 @@ def read_state(image: Image.Image) -> dict:
     state: dict = {"screen": detect_screen(pic)}
     if state["screen"] == "shop":
         state.update(read_shop(pic))
-    elif state["screen"] in ("result", "stats", "matchmaking", "blank", "battle", "run_over", "main_menu", "cash_in"):
+    elif state["screen"] in ("result", "stats", "matchmaking", "blank", "battle", "run_over", "main_menu", "main_menu_continue", "cash_in", "title"):
         # recognised. The battle field is read with read_battle() only on request: it takes
         # a few seconds, too slow for every frame while waiting.
         state["problems"] = []            # recognised; nothing on them is read yet

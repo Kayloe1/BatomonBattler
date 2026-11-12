@@ -500,6 +500,19 @@ class Hands:
         return self._press_and_wait("confirm result", "result", reader.RESULT_CONFIRM,
                                     {"shop", "event", "run_over", "gift_box", "trinket_pick", "cash_in"}, 40)
 
+    def leave_title(self) -> Result:
+        """Click on the title screen ("press any key to start"); the main menu follows."""
+        return self._press_and_wait("leave title", "title", reader.TITLE_ANYWHERE, {"main_menu", "main_menu_continue", "shop", "new_run"}, 20)
+
+    def continue_run(self) -> Result:
+        """Press Continue on the main menu (a run is open); the run's current screen follows.
+
+        New Run is never pressed on this menu: it would abandon the run that is open.
+        """
+        return self._press_and_wait("continue run", "main_menu_continue", reader.MAIN_MENU_CONTINUE,
+                                    {"shop", "result", "event", "gift_box", "trinket_pick", "cash_in",
+                                     "trainer_pick", "battle", "matchmaking"}, 30)
+
     def cash_in(self) -> Result:
         """Press "Cash In" on a trinket dialog (e.g. Fake Diamond after a loss: gain money)."""
         return self._press_and_wait("cash in", "cash_in", reader.CASH_IN_BUTTON,
