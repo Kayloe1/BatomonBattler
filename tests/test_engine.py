@@ -1,0 +1,178 @@
+"""Offline tests for the decision engine (no game needed).
+
+    python -m unittest tests.test_engine
+"""
+import random
+import unittest
+
+from engine import data, model, opponents
+from engine.choices import pick_trainer, pick_trinket
+from engine.evaluate import Evaluator
+from engine.model import BENCH, TEAM, Card, RunState, new_unit
+from engine.planner import Params, Planner, drag_works, moves_to
+
+FAST = Params(k_final=4, k_quick=3, reroll_samples=1, greedy_steps=1, final_rounds=1)
+
+
+def card(name, price=None):
+    sp = data.species(name)
+    return Card(name, sp.cost if price is None else price, "monster", tuple(sorted(sp.stats(1).items())), sp.rarity)
+
+
+def small_planner():
+    return Planner(Evaluator(opponents.pools(n=6, seed=1)), FAST)
+
+
+class Data(unittest.TestCase):
+    def test_roster(self):
+        r = data.roster()
+        self.assertEqual(len(r), 64)
+        self.assertEqual(r["Guardiant"].bug_growth[1], 8)
+        self.assertTrue(r["Stingarde"].self_ko)
+        self.assertTrue(r["Panbud"].evolves)
+        self.assertEqual(r["Velocect"].stats(2)["multicast"], 3)
+
+    def test_run_rules(self):
+        self.assertEqual([data.lives_lost(d) for d in (1, 2, 3, 4, 5, 9)], [1, 1, 2, 2, 3, 3])
+        self.assertEqual(data.income(1), 30)
+        self.assertEqual(data.income(2), 35)
+        self.assertEqual(data.hp_for_day(3), 800)
+
+
+class Model(unittest.TestCase):
+    def test_third_copy_merges_and_gives_gift(self):
+        s = RunState(money=100, shop=[card("Panbud")] * 3 + [None, None])
+        for i in range(3):
+            s = model.buy(s, i)
+        owned = [u for _, _, u in s.owned()]
+        self.assertEqual(len(owned), 1)
+        self.assertEqual(owned[0].level, 2)
+        self.assertEqual(owned[0].stat("damage"), 50)
+        self.assertEqual(s.gifts, ["Common"])
+        self.assertEqual(s.money, 70)
+
+    def test_two_level2_make_level3(self):
+        s = RunState(money=200, shop=[card("Panbud")] * 5)
+        s.team[0] = new_unit("Panbud", 30, level=2)
+        for i in range(3):
+            s = model.buy(s, i)
+        owned = [u for _, _, u in s.owned()]
+        self.assertEqual([u.level for u in owned], [3])
+
+    def test_bug_buy_grows_guardiant(self):
+        s = RunState(money=100, shop=[card("Velocect"), card("Panbud"), None, None, None])
+        s.team[1] = new_unit("Guardiant", 15)
+        s = model.buy(s, 0)
+        self.assertEqual(s.team[1].stat("damage"), 23)
+        s = model.buy(s, 1)                    # Panbud is not a Bug
+        self.assertEqual(s.team[1].stat("damage"), 23)
+
+    def test_full_board_only_takes_a_merging_copy(self):
+        s = RunState(money=100, shop=[card("Panbud"), card("Velocect"), None, None, None])
+        s.team = [new_unit("Mosslug", 10) for _ in range(6)]
+        s.bench = [new_unit("Panbud", 10), new_unit("Panbud", 10), new_unit("Pebbler", 15), new_unit("Pebbler", 15)]
+        self.assertTrue(model.can_buy(s, 0))
+        self.assertFalse(model.can_buy(s, 1))
+        t = model.buy(s, 0)
+        self.assertEqual(len(t.bench), 4)
+        self.assertEqual(sum(1 for u in t.bench if u and u.name == "Panbud" and u.level == 2), 1)
+
+    def test_sell_refunds_half(self):
+        s = RunState(money=0)
+        s.team[0] = new_unit("Formiqueen", 25)
+        self.assertEqual(model.sell(s, TEAM, 0).money, 13)
+
+    def test_from_reader(self):
+        state = {"screen": "shop", "day": 3, "lives": 8, "badges": 2, "money": 41, "shop_rank": 3,
+                 "trainer": "Rich Lady", "trainer_hp": 800, "locked": False, "reroll_price": 3,
+                 "shop_odds": {"Common": 75, "Uncommon": 25, "Rare": 0, "Super Rare": 0, "Legendary": 0},
+                 "shop": [{"name": "Panbud", "price": 10, "kind": "monster", "stats": [{"stat": "damage", "value": 25}]},
+                          None, None, None, {"name": "Cake", "price": 0, "kind": "item", "stats": []}],
+                 "team": [None, None, None, None, None,
+                          {"name": "Velocect", "level": 2, "stats": [{"stat": "damage", "value": 20},
+                                                                     {"stat": "multicast", "value": 3}]}],
+                 "bench": [None] * 4}
+        s = model.from_reader(state)
+        self.assertEqual(s.team[5].stat("multicast"), 3)
+        self.assertEqual(s.shop[4].kind, "item")
+        self.assertEqual(s.odds, (75, 25, 0, 0, 0))
+        self.assertEqual(s.hp_today, 800)
+
+
+class Moves(unittest.TestCase):
+    def apply(self, team, bench, actions):
+        cur = {(TEAM, i): u for i, u in enumerate(team)}
+        cur.update({(BENCH, i): u for i, u in enumerate(bench)})
+        for a in actions:
+            self.assertTrue(drag_works(a.src, a.dst, cur[a.dst] is not None), f"illegal drag {a}")
+            cur[a.src], cur[a.dst] = cur[a.dst], cur[a.src]
+        return [cur[(TEAM, i)] for i in range(6)]
+
+    def test_same_row_swap_goes_through_an_empty_slot(self):
+        a, b = new_unit("Panbud", 10), new_unit("Velocect", 15)
+        team0 = [a, b, None, None, None, None]
+        team1 = [b, a, None, None, None, None]
+        acts = moves_to(team0, [None] * 4, team1, [None] * 4)
+        self.assertEqual(self.apply(team0, [None] * 4, acts), team1)
+
+    def test_full_board_rearrangement(self):
+        u = [new_unit(n, 10) for n in ("Panbud", "Velocect", "Mosslug", "Pebbler", "Magmite", "Spinarai")]
+        bench = [new_unit(n, 10) for n in ("Venopuff", "Joltail", "Dribblet", "Stingarde")]
+        target = [u[1], u[0], bench[0], u[4], u[3], u[5]]
+        acts = moves_to(u, bench, target, [u[2]] + bench[1:])
+        self.assertEqual(self.apply(u, bench, acts), target)
+
+
+class Planning(unittest.TestCase):
+    def test_day1_spends_on_monsters(self):
+        p = small_planner()
+        s = RunState(day=1, money=30, shop=[card("Panbud"), card("Velocect"), card("Stingarde"), card("Pebbler"), None])
+        rng = random.Random(0)
+        for _ in range(10):
+            plan = p.decide(s)
+            a = plan.actions[0]
+            if a.kind == "buy":
+                s = model.buy(s, a.index)
+            elif a.kind == "reroll":
+                s = model.reroll(s, rng)
+            elif a.kind == "sell":
+                s = model.sell(s, *a.src)
+            else:
+                break
+        self.assertGreaterEqual(len(s.owned()), 2)
+        self.assertLessEqual(s.money, 10)
+
+    def test_end_of_turn_has_battle_last(self):
+        p = small_planner()
+        s = RunState(day=2, money=0, shop=[None] * 5)
+        s.team[5] = new_unit("Velocect", 15)
+        s.bench[0] = new_unit("Panbud", 10)
+        plan = p.decide(s)
+        self.assertEqual(plan.actions[-1].kind, "battle")
+
+    def test_unknown_monster_is_never_sold(self):
+        p = small_planner()
+        s = RunState(day=2, money=0, shop=[card("Formiqueen"), None, None, None, None])
+        s.team = [model.Unit(None, 1)] + [new_unit("Panbud", 10)] * 5
+        s.bench = [model.Unit(None, 1)] * 4
+        plan = p.decide(s)
+        for a in plan.actions:
+            if a.kind == "sell":
+                self.assertIsNotNone(s.slot(*a.src).name)
+
+
+class Choices(unittest.TestCase):
+    def test_trainer_avoids_mad_scientist(self):
+        k, _ = pick_trainer(["Mad Scientist", "Painter", "Gentleman"])
+        self.assertEqual(k, 1)
+
+    def test_trinket_pick_returns_an_index(self):
+        p = small_planner()
+        s = RunState(day=3)
+        s.team[1] = new_unit("Velocect", 15)
+        k, why = pick_trinket(p, s, ["Wood Sword", "Gold Nugget", None])
+        self.assertIn(k, (0, 1))
+
+
+if __name__ == "__main__":
+    unittest.main()
