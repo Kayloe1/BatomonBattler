@@ -498,7 +498,12 @@ class Hands:
     def confirm_result(self) -> Result:
         """Press CONFIRM on the result box; the next shop, an event or the end of the run follows."""
         return self._press_and_wait("confirm result", "result", reader.RESULT_CONFIRM,
-                                    {"shop", "event", "run_over", "gift_box", "trinket_pick"}, 40)
+                                    {"shop", "event", "run_over", "gift_box", "trinket_pick", "cash_in"}, 40)
+
+    def cash_in(self) -> Result:
+        """Press "Cash In" on a trinket dialog (e.g. Fake Diamond after a loss: gain money)."""
+        return self._press_and_wait("cash in", "cash_in", reader.CASH_IN_BUTTON,
+                                    {"shop", "event", "run_over", "gift_box", "trinket_pick", "cash_in"}, 40)
 
     def start_casual_run(self) -> Result:
         """Start a new CASUAL Pantra run from the end-of-run screen or the New Run dialog.
@@ -510,7 +515,12 @@ class Hands:
         """
         name = "start casual run"
         before = self.look()
-        if before["screen"] == "run_over":
+        if before["screen"] == "main_menu":
+            self._click(reader.MAIN_MENU_NEW_RUN)
+            if self.dry_run:
+                return self._log(name, Result(True, "dry run: nothing sent", before))
+            state = self.wait_for({"new_run"}, 15)
+        elif before["screen"] == "run_over":
             self._click(reader.RUN_OVER_NEW_RUN)
             if self.dry_run:
                 return self._log(name, Result(True, "dry run: nothing sent", before))
