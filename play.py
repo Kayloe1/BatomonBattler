@@ -1,13 +1,17 @@
-"""Play the run that is open in the game with simple rules, and log everything.
+"""Play the run that is open in the game, and log everything.
 
     python play.py            # play until the run ends or something is unclear
     python play.py --days 1   # stop after one battle
+    python play.py --simple   # the old simple rules instead of the decision engine
 
-Rules (deliberately simple; the simulator will replace them):
-- shop: use every free item, then keep buying the most expensive monster that
-  is affordable while the team has an empty slot, then press BATTLE!
-- result box: CONFIRM
-- event: take the last choice; trinket gift: take the first card
+Decisions (engine/, see docs/decision-engine.md):
+- shop: the engine picks one action at a time (use an item, buy, sell, reroll),
+  scoring each by simulated battles against a spread of likely opponents, then
+  LOCK if a card is worth saving for, moves the team into the best layout and
+  presses BATTLE!. The state is read again after every action.
+- trinket gift: the trinket that helps the team most in the simulator
+- trainer: Ed's record per trainer, minus trainers that fight the plan
+- result box: CONFIRM; event: the last choice (event texts are not read yet)
 
 It continues the run that is open. With --new-run it may also start one, but
 only a Casual run: hands.start_casual_run() presses CONFIRM only after reading
@@ -23,6 +27,12 @@ import sys
 from datetime import datetime
 
 import hands as hands_mod
+
+try:
+    from engine.bot import Brain
+except ImportError as e:                 # engine needs the simulator (sim/)
+    Brain = None
+    _ENGINE_ERROR = e
 
 
 # Ed's best results so far were with these trainers; otherwise the left card is taken.
@@ -44,14 +54,38 @@ def choose_purchase(state: dict) -> int | None:
     return -neg_i
 
 
+def act(h, a):
+    """Carry out one engine action with the hands."""
+    if a.kind == "buy":
+        return h.buy(a.index)
+    if a.kind == "item":
+        return h.use_item(a.index)
+    if a.kind == "sell":
+        return h.sell(a.src)
+    if a.kind == "reroll":
+        return h.reroll()
+    if a.kind == "lock":
+        return h.lock()
+    if a.kind == "move":
+        return h.move(a.src, a.dst)
+    raise ValueError(f"unknown action {a}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--days", type=int, default=99, help="stop after this many battles")
+    ap.add_argument("--simple", action="store_true", help="use the old simple shop rules")
     ap.add_argument("--new-run", action="store_true",
                     help="if no run is open, start a CASUAL Pantra run (never Ranked) and pick a trainer")
     args = ap.parse_args()
 
     h = hands_mod.Hands(dry_run=False)
+    brain = None
+    if not args.simple:
+        if Brain is None:
+            print("decision engine unavailable:", _ENGINE_ERROR)
+            return 1
+        brain = Brain()
     log_path = hands_mod.LOG_DIR / f"run_{datetime.now():%Y%m%d_%H%M%S}.jsonl"
 
     def log(kind: str, **data) -> None:
@@ -64,6 +98,7 @@ def main() -> int:
         return 1
 
     battles = 0
+    last_shop_state: dict | None = None
     played = False          # True once this session has acted inside a run
     last_shop: dict | None = None
     while True:
@@ -84,15 +119,40 @@ def main() -> int:
                 print(f"day {last_shop['day']}: badges {outcome['badges']:+d}, lives {outcome['lives']:+d}")
                 last_shop = None
             log("shop", state=state)
-            i = choose_purchase(state)
-            if i is not None:
-                card = state["shop"][i]
-                r = h.buy(i)
-                print(f"day {state['day']}: buy {card['name']} (${card['price']}) -> {r.message}")
-                log("buy", card=card, ok=r.ok, message=r.message)
-                if not r.ok:
-                    return stop(f"buy failed: {r.message} (capture: {(r.after or {}).get('saved_capture')})", r.after)
-                continue
+            if brain is None:
+                i = choose_purchase(state)
+                if i is not None:
+                    card = state["shop"][i]
+                    r = h.buy(i)
+                    print(f"day {state['day']}: buy {card['name']} (${card['price']}) -> {r.message}")
+                    log("buy", card=card, ok=r.ok, message=r.message)
+                    if not r.ok:
+                        return stop(f"buy failed: {r.message} (capture: {(r.after or {}).get('saved_capture')})", r.after)
+                    continue
+            else:
+                brain.observe_shop(state)
+                last_shop_state = state
+                plan = brain.shop_plan(state)
+                a = plan.actions[0]
+                log("plan", actions=[str(x) for x in plan.actions], why=[x.why for x in plan.actions],
+                    notes=plan.notes, value=plan.value)
+                if a.kind != "battle" and not (a.kind in ("lock", "move")):
+                    r = act(h, a)
+                    print(f"day {state['day']}: {a.why} -> {r.message}")
+                    log(a.kind, action=str(a), why=a.why, ok=r.ok, message=r.message)
+                    if not r.ok:
+                        return stop(f"{a} failed: {r.message} (capture: {(r.after or {}).get('saved_capture')})", r.after)
+                    continue
+                # end of the turn: lock, moves, then battle
+                for b in plan.actions[:-1]:
+                    r = act(h, b)
+                    print(f"day {state['day']}: {b} ({b.why}) -> {r.message}")
+                    log(b.kind, action=str(b), why=b.why, ok=r.ok, message=r.message)
+                    if not r.ok:
+                        # a failed move leaves a worse layout, not a broken run: stop moving
+                        print("  layout step failed; battling with the layout as it is")
+                        break
+                print(f"day {state['day']}: {plan.notes[-1] if plan.notes else ''}")
             if battles >= args.days:
                 print("day limit reached; stopping before BATTLE!")
                 log("stop", why="day limit")
@@ -127,15 +187,22 @@ def main() -> int:
         elif screen == "trinket_pick":
             h.last_image.save(hands_mod.CAPTURE_DIR / f"trinket_pick_{datetime.now():%Y%m%d_%H%M%S}.png")
             offered = state["trinkets"]
-            r = h.pick_trinket(0)
-            print(f"trinkets {offered}: took the first -> {r.message}")
-            log("trinket", offered=offered, picked=0, ok=r.ok, message=r.message)
+            k, why = brain.trinket(last_shop_state, offered) if brain else (0, "first card")
+            r = h.pick_trinket(k)
+            print(f"trinkets {offered}: took {offered[k] if k < len(offered) else k} ({why}) -> {r.message}")
+            log("trinket", offered=offered, picked=k, why=why, ok=r.ok, message=r.message)
             if not r.ok:
                 return stop(f"after picking a trinket: {r.message}", r.after)
         elif screen == "trainer_pick":
             h.last_image.save(hands_mod.CAPTURE_DIR / f"trainer_pick_{datetime.now():%Y%m%d_%H%M%S}.png")
             offered = state["trainers"]
-            k = next((offered.index(t) for t in PREFERRED_TRAINERS if t in offered), 0)
+            if brain:
+                k, why = brain.trainer(offered)
+                brain.new_run()
+            else:
+                k = next((offered.index(t) for t in PREFERRED_TRAINERS if t in offered), 0)
+                why = "preferred list"
+            print(f"trainer choice: {why}")
             r = h.pick_trainer(k)
             print(f"trainers {offered}: picked {offered[k] or 'card ' + str(k)} -> {r.message}")
             log("trainer", offered=offered, picked=k, ok=r.ok, message=r.message)
