@@ -174,5 +174,14 @@ class Choices(unittest.TestCase):
         self.assertIn(k, (0, 1))
 
 
+class FreeItems(unittest.TestCase):
+    def test_free_cake_is_always_used_before_battle(self):
+        s = RunState(money=0, shop=[None, None, None, None, Card("Cake", 0, "item", (), "Common")])
+        s.team[0] = new_unit("Dribblet", 20)          # no damage badge: the simulator sees no gain
+        plan = small_planner().decide(s)
+        self.assertEqual([a.kind for a in plan.actions], ["item"])
+        self.assertEqual(plan.actions[0].index, 4)
+
+
 if __name__ == "__main__":
     unittest.main()

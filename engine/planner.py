@@ -29,6 +29,9 @@ from .evaluate import Evaluator, team_key
 from .model import BENCH, TEAM, RunState, Unit
 
 GIFT_VALUE = {"Common": 0.025, "Uncommon": 0.035, "Rare": 0.05, "Super Rare": 0.07, "Legendary": 0.09}
+# Free items that can only help: used at the end of the turn when nothing else was worth doing, so the
+# simulator's small estimate of their value can never leave a free Cake sitting in the shop.
+FREE_BUFFS = {"Cake", "Feast", "Pom Berry", "Gray Chip"}
 TICKETS = {"Gray Ticket", "Green Ticket", "Blue Ticket", "Purple Ticket", "Golden Ticket"}
 
 
@@ -314,6 +317,10 @@ class Planner:
         for i, c in enumerate(s.shop):
             if c and c.kind == "item" and c.name in TICKETS and c.price <= s.money and s.items_left > 0:
                 return Plan([Action("item", i, why=f"use {c.name} (shop of one rarity)")], base, notes)
+        if s.items_left > 0 and s.owned():
+            for i, c in enumerate(s.shop):
+                if c and c.kind == "item" and c.name in FREE_BUFFS and c.price == 0:
+                    return Plan([Action("item", i, why=f"use free {c.name}")], base, notes)
         actions: list[Action] = []
         lock = self._lock_choice(s, team, bench, base)
         if lock:
