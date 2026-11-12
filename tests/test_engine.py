@@ -183,5 +183,28 @@ class FreeItems(unittest.TestCase):
         self.assertEqual(plan.actions[0].index, 4)
 
 
+class Explain(unittest.TestCase):
+    STATE = {"day": 1, "money": 40, "lives": 10, "badges": 0,
+             "team": [{"name": "Brawlmantis"}] + [None] * 5, "bench": [None] * 4}
+
+    def test_choice_is_listed_with_the_options(self):
+        from engine.explain import explain
+        s = RunState(money=40, shop=[card("Panbud"), card("Velocect"), None, None, None])
+        s.team[0] = new_unit("Brawlmantis", 30)
+        plan = small_planner().decide(s)
+        text = "\n".join(explain(plan, self.STATE))
+        self.assertTrue(plan.considered)
+        self.assertIn("<-- my choice", text)
+        self.assertIn("Decision: " + plan.actions[0].why, text)
+
+    def test_end_of_turn_says_why_it_battles(self):
+        from engine.explain import explain
+        s = RunState(money=0, shop=[None] * 5)
+        s.team[0] = new_unit("Brawlmantis", 30)
+        text = "\n".join(explain(small_planner().decide(s), self.STATE))
+        self.assertIn("Battle:", text)
+        self.assertNotIn("my choice", text)
+
+
 if __name__ == "__main__":
     unittest.main()
