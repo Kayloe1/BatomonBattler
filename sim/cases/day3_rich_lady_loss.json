@@ -1,0 +1,159 @@
+{
+  "title": "Rich Lady run, Day 3 loss (2026-11-11)",
+  "sources": "logs/run_20261111_103421.jsonl (Ed's team as read on the shop screen before BATTLE!), captures/result_loss_day3.png (both teams and both HP bars at the end). The opponent's starting badges are worked back from the end screen: Spinarai shows 3 damage / 17 Poison at the end, which is 5 at the start plus 4 Noxnimbus casts of +3.",
+  "a": {
+    "trainer": "Rich Lady",
+    "hp": 800,
+    "slots": [
+      {
+        "name": "Brawlmantis",
+        "level": 1,
+        "stats": {
+          "damage": 60
+        }
+      },
+      {
+        "name": "Venopuff",
+        "level": 1,
+        "stats": {
+          "damage": 15,
+          "poison": 4
+        }
+      },
+      {
+        "name": "Dribblet",
+        "level": 1,
+        "stats": {
+          "damage": 10,
+          "heal": 20
+        }
+      },
+      {
+        "name": "Electranade",
+        "level": 1,
+        "stats": {
+          "shock": 25
+        }
+      },
+      {
+        "name": "Mosslug",
+        "level": 1,
+        "stats": {
+          "damage": 15,
+          "heal": 30
+        }
+      },
+      {
+        "name": "Panbud",
+        "level": 1,
+        "stats": {
+          "damage": 35
+        }
+      }
+    ]
+  },
+  "b": {
+    "hp": 800,
+    "slots": [
+      {
+        "name": "Spinarai",
+        "level": 1,
+        "stats": {
+          "damage": 3,
+          "poison": 5
+        }
+      },
+      {
+        "name": "Noxnimbus",
+        "level": 1,
+        "stats": {
+          "poison": 5
+        }
+      },
+      {
+        "name": "Brawlmantis",
+        "level": 1,
+        "stats": {
+          "damage": 50
+        }
+      },
+      null,
+      {
+        "name": "Mosslug",
+        "level": 1,
+        "stats": {
+          "damage": 5,
+          "heal": 30
+        }
+      },
+      {
+        "name": "Venopuff",
+        "level": 1,
+        "stats": {
+          "damage": 7,
+          "poison": 8
+        }
+      }
+    ]
+  },
+  "expect": {
+    "winner": "b",
+    "time_between": [
+      14.0,
+      15.0
+    ],
+    "snapshot": {
+      "at": 14.0,
+      "b_damage_taken": 676,
+      "a_status": {
+        "poison": 101
+      },
+      "b_status": {
+        "poison": 16,
+        "shock": 25
+      },
+      "a_units": {
+        "4": {
+          "triggered": 1,
+          "inflicted_shock": 25
+        },
+        "5": {
+          "triggered": 2,
+          "stats": {
+            "damage": 55
+          }
+        }
+      },
+      "b_units": {
+        "1": {
+          "stats": {
+            "poison": 17
+          }
+        },
+        "2": {
+          "triggered": 4,
+          "stats": {
+            "poison": 5
+          }
+        },
+        "5": {
+          "stats": {
+            "damage": 45
+          }
+        },
+        "6": {
+          "stats": {
+            "poison": 8
+          }
+        }
+      },
+      "a_damage_taken_at_least": 800
+    },
+    "known_gaps": {
+      "winner": "The simulator has Ed alive at 14 s; the game had him at 0 HP by 15 s.",
+      "time_between": "Same gap: the simulated battle runs on to 16 s.",
+      "snapshot.a_damage_taken_at_least": "By 14 s the simulator has Ed taking 662 net of heals (802 before his 140 of heals), but the game had him at 0 of 800. The missing ~140 equals his heals, so either his heals did not count or the opponent had ~140 damage the end screen does not show."
+    },
+    "notes": "End screen: Ed 0/800, opponent 124/800. Ed's Mosslug ended at 55 damage (2 casts) and the opponent's Spinarai at 17 Poison, Ed's bar showed 101 Poison (the Spinarai cast at 15 s would have made it 118), so the battle ended at 14-15 s."
+  }
+}

@@ -1,4 +1,10 @@
-# Status (2026-11-11, end of fourth session)
+# Status (2026-11-12: battle simulator added; 2026-11-11: end of fourth session)
+
+**New on 2026-11-12: the offline battle simulator (step 3), in `sim/`.** `python -m sim --check` replays the
+two recorded battles: the Day 2 win is reproduced exactly (winner, end time, every Stats number), and the
+Day 3 loss is exact on the opponent's side (HP 124/800, their Poison and Shock, every badge) but the sim
+keeps Ed alive about 2 s too long, short by exactly his 140 of heals. What is verified and what is guessed:
+`docs\simulator.md` and `python -m sim --rules`. The simple shop rules do not use it yet.
 
 The program now **starts a Casual run, plays it to the end, and stops**. Two runs were played today:
 1. The run Ed had open (Rich Lady), from Day 2 to its end on Day 8 with 3 badges.
@@ -20,7 +26,8 @@ replaces them.
 | `teach.py` | Rebuilds `templates\glyphs.json` from the labelled captures in its `LESSONS` list and adds their sprites. |
 | `hands.py` | Live or dry-run. Verified live: buy, use item, move (drag), sell, reroll, lock/unlock, battle (waits for the result, turns fast forward on if off), confirm result, event choice, open gift, pick trinket, pick trainer, and `start_casual_run()`. Each action reads the state first and checks it afterwards. |
 | `play.py` | Simple-rules loop: use free items, buy the dearest affordable monster while the team has an empty slot, BATTLE!, CONFIRM, last event option, first trinket, preferred trainer (Monster Ranger, Swim Coach, else the left card). With `--new-run` it starts a Casual run when none is open. Stops on anything unclear and at the end of the run. |
-| `tests\` | `.venv\Scripts\python.exe -m unittest discover tests` |
+| `sim\` | Offline battle simulator: `simulate(team_a, team_b)`, `team_from_reader(state)`, `win_rate()`. CLI `python -m sim`. Recorded battles in `sim\cases\`. See `docs\simulator.md`. |
+| `tests\` | `.venv\Scripts\python.exe -m unittest discover tests` (`tests\test_sim.py` needs only Python) |
 
 Logs: `logs\actions_<date>.jsonl` (every action with the state before and after) and `logs\run_<time>.jsonl`.
 
@@ -62,9 +69,11 @@ and Stats screen numbers that match the CSV data.
 ## Next steps
 1. Run `play.py --new-run` a few more times in Casual until a whole run passes with no stop (this fills in
    the remaining glyphs). Add the main menu so it can also start from there.
-2. Read the Stats screen after each battle into the log, and log the opponent's team. The simulator needs both.
-3. Read event options and trinket effects so those choices can be made on purpose.
-4. Build the simulator from the CSV data and check it against the logged battles (step 3 of the plan).
+2. Read the Stats screen after each battle into the log, and log the opponent's team from the battle screen.
+   Each such battle becomes a new simulator check (a JSON file in `sim\cases\`); only two exist today.
+3. Settle the Day 3 gap (do heals count while heavily poisoned?) with a Replay of a battle where we heal
+   under Poison; see `docs\simulator.md`.
+4. Read event options and trinket effects so those choices can be made on purpose.
 5. Replace the simple shop rules with simulator-scored choices, including selling and the bench.
 
 ## Safety rules (unchanged)

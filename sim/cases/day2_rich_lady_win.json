@@ -1,0 +1,39 @@
+{
+  "title": "Rich Lady run, Day 2 win (2026-11-11)",
+  "sources": "captures/battle_day2.png (both teams at battle start), captures/stats_day2.png (Stats screen), docs/step2-screen-map.md",
+  "a": {
+    "trainer": "Rich Lady", "hp": 500,
+    "slots": [
+      {"name": "Brawlmantis", "level": 1, "stats": {"damage": 50}},
+      {"name": "Venopuff", "level": 1, "stats": {"damage": 5, "poison": 4}},
+      {"name": "Dribblet", "level": 1, "stats": {"heal": 20}},
+      null,
+      {"name": "Mosslug", "level": 1, "stats": {"damage": 5, "heal": 30}},
+      {"name": "Panbud", "level": 1, "stats": {"damage": 25}}
+    ]
+  },
+  "b": {
+    "hp": 500,
+    "slots": [
+      {"name": "Dragon Egg", "level": 1, "stats": {"damage": 1}},
+      null, null,
+      {"name": "Venopuff", "level": 1, "stats": {"poison": 4}},
+      null, null
+    ]
+  },
+  "expect": {
+    "winner": "a",
+    "time_between": [18.0, 20.0],
+    "a_units": {
+      "1": {"triggered": 3, "dealt": 150},
+      "2": {"triggered": 5, "dealt": 25, "inflicted_poison": 20},
+      "3": {"triggered": 6, "healed": 120},
+      "5": {"triggered": 3, "dealt": 75, "healed": 90},
+      "6": {"triggered": 3, "dealt": 75}
+    },
+    "b_units": {
+      "1": {"triggered": 1, "dealt": 1},
+      "4": {"inflicted_poison": 20}
+    }
+  }
+}
