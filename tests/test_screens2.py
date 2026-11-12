@@ -30,6 +30,29 @@ class NewScreens(unittest.TestCase):
         self.assertGreater(reader._near(pic[y0:y1, x0:x1], (239, 66, 107), 40).mean(), 0.5)
         self.assertLess(y1, 796)            # the Continue box ends above the New Run button (starts at y 796)
 
+    def test_continue_panel_reads_casual(self):
+        st = state("continue_confirm_casual.png")
+        self.assertEqual(st["screen"], "continue_confirm")
+        self.assertEqual(st["mode"], "casual")
+
+    def test_continue_panel_refuses_any_other_label(self):
+        pic = np.asarray(window.canonical_picture(Image.open(CAP / "continue_confirm_casual.png"))).copy()
+        x0, y0, x1, y1 = reader.CONTINUE_MODE_LABEL
+        label = pic[y0:y1, x0:x1].copy()
+        # a longer label (as "RANKED MODE" or anything unseen would be): not casual
+        pic[y0:y1, x0 + 60:x1] = label[:, :-60]
+        self.assertIsNone(reader.continue_mode(pic))
+        # no label at all: not casual
+        pic[y0:y1, x0:x1] = 255
+        self.assertIsNone(reader.continue_mode(pic))
+
+    def test_continue_buttons(self):
+        pic = np.asarray(window.canonical_picture(Image.open(CAP / "continue_confirm_casual.png")))
+        for box in (reader.CONTINUE_CONFIRM, reader.CONTINUE_CANCEL):
+            x0, y0, x1, y1 = box
+            self.assertGreater(reader._near(pic[y0:y1, x0:x1], (239, 66, 107), 40).mean(), 0.5)
+        self.assertGreater(reader.CONTINUE_CONFIRM[0], reader.CONTINUE_CANCEL[2])
+
     def test_title(self):
         self.assertEqual(state("title_screen.png")["screen"], "title")
         self.assertEqual(state("title_screen.png")["problems"], [])

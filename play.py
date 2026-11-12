@@ -272,6 +272,15 @@ def main(argv=None) -> int:
             log("continue_run", ok=r.ok, message=r.message)
             if not r.ok:
                 return stop(f"after Continue: {r.message} (capture: {(r.after or {}).get('saved_capture')})", r.after)
+        elif screen == "continue_confirm":
+            # only a run shown as CASUAL MODE is continued (read twice); otherwise stop and tell
+            r = h.confirm_continue()
+            print(f"continue panel -> {r.message}")
+            log("confirm_continue", ok=r.ok, message=r.message)
+            if not r.ok:
+                h.last_image.save(hands_mod.CAPTURE_DIR / f"continue_panel_{datetime.now():%Y%m%d_%H%M%S}.png")
+                return stop(f"continue panel: {r.message}. I did not press Confirm.", r.after)
+            played = True
         elif screen == "title":
             r = h.leave_title()
             log("title", ok=r.ok, message=r.message)

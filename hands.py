@@ -510,8 +510,37 @@ class Hands:
         New Run is never pressed on this menu: it would abandon the run that is open.
         """
         return self._press_and_wait("continue run", "main_menu_continue", reader.MAIN_MENU_CONTINUE,
-                                    {"shop", "result", "event", "gift_box", "trinket_pick", "cash_in",
-                                     "trainer_pick", "battle", "matchmaking"}, 30)
+                                    {"continue_confirm", "shop", "result", "event", "gift_box", "trinket_pick",
+                                     "cash_in", "trainer_pick", "battle", "matchmaking"}, 30)
+
+    def confirm_continue(self) -> Result:
+        """Press Confirm on the panel that follows Continue, only for a CASUAL run.
+
+        Same gate as start_casual_run(): two fresh captures in a row must both show the panel
+        with the exact "CASUAL MODE" label. Anything else (a Ranked label, an unreadable one)
+        is refused and nothing is clicked; this method never presses Confirm for a Ranked run.
+        """
+        name = "confirm continue"
+        before = self.look()
+        if before.get("screen") != "continue_confirm":
+            return self._log(name, Result(False, f"not on the continue panel ({before.get('screen')})", before))
+        if self.dry_run:
+            return self._log(name, Result(True, "dry run: nothing sent", before))
+        state = before
+        for _ in range(2):
+            time.sleep(0.3)
+            state = self.look()
+            if not (state.get("screen") == "continue_confirm" and state.get("mode") == "casual"
+                    and not state["problems"]):
+                return self._log(name, Result(
+                    False, f"NOT confirmed: the saved run is not shown as CASUAL MODE "
+                           f"(mode={state.get('mode')}, screen={state.get('screen')})", before, state))
+        clicks = self._click(reader.CONTINUE_CONFIRM)
+        wanted = {"shop", "result", "event", "gift_box", "trinket_pick", "cash_in", "trainer_pick",
+                  "battle", "matchmaking"}
+        after = self.wait_for(wanted, 40)
+        ok = after.get("screen") in wanted
+        return self._log(name, Result(ok, f"Casual run continued; now on '{after.get('screen')}'", before, after, clicks))
 
     def cash_in(self) -> Result:
         """Press "Cash In" on a trinket dialog (e.g. Fake Diamond after a loss: gain money)."""

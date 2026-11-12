@@ -119,6 +119,10 @@ SCREENS: dict[str, list[tuple[int, int, tuple[int, int, int]]]] = {
     # The rows are different in the two menus, so neither can be taken for the other.
     "main_menu": [(900, 772, RED), (900, 924, RED), (900, 1076, RED), (900, 1228, RED),
                   (25, 1118, (21, 157, 216)), (25, 1238, (21, 157, 216))],
+    # After Continue on the main menu: a panel with the saved run (mode, day, lives, badges, team) and
+    # Cancel / Confirm. The hamburger button top right is greyed out while it shows.
+    "continue_confirm": [(600, 1215, RED), (1900, 1215, RED), (850, 900, (231, 231, 231)), (1250, 850, (255, 255, 255)),
+                         (2480, 110, (123, 123, 123)), (25, 1118, (21, 157, 216)), (25, 1238, (21, 157, 216))],
     # Title screen: the logo, the dragon silhouette and the dark "PRESS ANY KEY TO START" label
     "title": [(768, 240, (237, 103, 250)), (1408, 240, (67, 249, 245)), (1280, 739, (111, 49, 71)),
               (890, 1045, (55, 55, 55)), (1650, 1045, (55, 55, 55))],
@@ -138,6 +142,40 @@ def fast_forward_on(pic: np.ndarray) -> bool:
 
 # Buttons on the other screens
 RESULT_CONFIRM: Box = BATTLE_BUTTON
+CONTINUE_CONFIRM: Box = (1300, 1160, 1955, 1265)
+CONTINUE_CANCEL: Box = (590, 1160, 1245, 1265)
+CONTINUE_MODE_LABEL: Box = (580, 600, 1000, 680)      # "CASUAL MODE", top left of the panel
+CONTINUE_MODE_GREY = (126, 126, 126)
+CASUAL_LABEL_FILE = ROOT / "templates" / "continue_casual_mode.png"
+
+
+def continue_mode_mask(pic: np.ndarray) -> np.ndarray | None:
+    """The mode label of the continue panel as a trimmed text mask (None if nothing is there)."""
+    m = _near(crop(pic, CONTINUE_MODE_LABEL), CONTINUE_MODE_GREY, 10)
+    ys, xs = np.nonzero(m)
+    if len(ys) < 50:
+        return None
+    return m[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+
+
+def continue_mode(pic: np.ndarray) -> str | None:
+    """"casual" only when the label is, pixel for pixel, the saved "CASUAL MODE" label; else None.
+
+    Anything else (a Ranked label, a label never seen, a shifted picture) is None, and the bot
+    then refuses to press Confirm. There is deliberately no way for this to return "ranked".
+    """
+    m = continue_mode_mask(pic)
+    if m is None or not CASUAL_LABEL_FILE.exists():
+        return None
+    tpl = np.asarray(Image.open(CASUAL_LABEL_FILE).convert("L")) > 127
+    if abs(m.shape[0] - tpl.shape[0]) > 1 or abs(m.shape[1] - tpl.shape[1]) > 1:
+        return None
+    h, w = min(m.shape[0], tpl.shape[0]), min(m.shape[1], tpl.shape[1])
+    a, b = m[:h, :w], tpl[:h, :w]
+    iou = np.logical_and(a, b).sum() / max(np.logical_or(a, b).sum(), 1)
+    return "casual" if iou >= 0.97 else None
+
+
 TITLE_ANYWHERE: Box = (1180, 1300, 1380, 1400)     # empty sky under the label
 MAIN_MENU_NEW_RUN: Box = (845, 730, 1715, 815)        # only on the four-button menu
 MAIN_MENU_CONTINUE: Box = (845, 654, 1715, 738)       # only on the five-button menu
@@ -1142,6 +1180,9 @@ def read_state(image: Image.Image) -> dict:
         # recognised. The battle field is read with read_battle() only on request: it takes
         # a few seconds, too slow for every frame while waiting.
         state["problems"] = []            # recognised; nothing on them is read yet
+    elif state["screen"] == "continue_confirm":
+        state["mode"] = continue_mode(pic)
+        state["problems"] = []            # an unreadable mode is not a reading error: hands refuses to confirm
     elif state["screen"] == "gift_box":
         state["problems"] = []
     elif state["screen"] == "trinket_pick":
