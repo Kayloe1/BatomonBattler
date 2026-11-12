@@ -1,0 +1,65 @@
+name,lv2,lv3,lv4
+Bumblebolt,Deal 6; Shock 2,Deal 9; Shock 3,Deal 9; Shock 3; Multicast 2
+Dribblet,Heal 40,EVOLVED: Deal 30; Heal 45 | On Battle Start: +60 Damage and +60 Heal permanently,Deal 60; Heal 90 | On Battle Start: +120 Damage and +120 Heal permanently
+Guardiant,Deal 15 | +16 Damage per Bug bought,Deal 15 | +24 Damage per Bug bought,Deal 30 | +48 Damage per Bug bought
+Joltail,Deal 2; Shock 8,Deal 3; Shock 12,Deal 3; Shock 12; Multicast 2
+Magmite,Shield 80; Burn 8,Shield 120; Burn 12,Shield 480; Burn 12
+Mosslug,Heal 60 | On Cast +40 Damage this battle,Heal 90 | On Cast +60 Damage this battle,Heal 90 | On Cast +120 Damage this battle
+Panbud,Deal 50,EVOLVED Bambudo: Deal 75 | On Cast +35 Damage permanently,Bambudo: Deal 150 | On Cast +70 Damage permanently
+Pebbler,Shield 40 | On Cast +30 Shield this battle,Shield 60 | On Cast +45 Shield this battle,Shield 120 | On Cast +90 Shield this battle
+Scorchimp,Deal 10; Burn 10,EVOLVED Sunsage: Deal 15; Burn 15 | On Battle Start: for each Fire ally gains +20% Cooldown Speed permanently,Sunsage: Deal 15; Burn 15; Multicast 2 | same passive +20%
+Spinarai,Deal 6; Poison 2,Deal 9; Poison 3,Deal 9; Poison 3; Multicast 2
+Stingarde,Deal 300 | Knockout self,Deal 450 | Knockout self,Deal 1350 | Knockout self
+Velocect,Deal 20; Multicast 3,Deal 25; Multicast 4,Deal 25; Multicast 8
+Venopuff,Poison 8,Poison 12,Poison 12; Multicast 2
+Berroon,Deal 40 | next 2 shop items are Berries,Deal 40 | next 3 Berries,Deal 160 | next 6 Berries
+Boomagon,Deal 40 | +6% Cooldown Speed to ally behind,Deal 40 | +9%,Deal 40 | +18%
+Brawlmantis,Deal 100 | On Victory +20 Damage,Deal 150 | On Victory +30 Damage,Deal 150; Multicast 2 | On Victory +60 Damage
+Cinderfly,Burn 7 | +20% Cooldown Speed per Bug bought,Burn 7 | +30%,Burn 14; Multicast 2 | +60%
+Craghorn,Deal 20; Shield 20 | +40 Damage and Shield per item used,Deal 20; Shield 20 | +60,Deal 80; Shield 80 | +120
+Electranade,Shock 50 | Knockout self,Shock 75 | Knockout self,Shock 300 | Knockout self
+Frizzly,Deal 1; Shock 16,Deal 1; Shock 24,Deal 1; Shock 48; Multicast 2
+Gildshell,Deal 1 | +40 Sell Value per day,Deal 1 | +60 Sell Value per day,Deal 100 | +240 Sell Value per day
+Noxnimbus,Poison 1 | adjacent Toxic +6 Poison,Poison 1 | +9 Poison,Poison 1; Multicast 2 | +18 Poison
+Plunderbird,Deal 1; Heal 35; Multicast 3 | Gain $1,Deal 1; Heal 55; Multicast 4 | Gain $1,Deal 1; Heal 55; Multicast 8 | Gain $2
+Puffloon,Heal 10; Poison 1; Multicast 2,Heal 10; Poison 1; Multicast 3,Heal 10; Poison 1; Multicast 12
+Pyronade,Burn 40 | Knockout self,Burn 60 | Knockout self,Burn 240 | Knockout self
+Runerock,Shield 280 | remove 30 debuff stacks,Shield 420 | remove 45,Shield 840 | remove 90
+Shogapede,Poison 6 | +20% Cooldown Speed per Bug bought,Poison 6 | +30%,Poison 12; Multicast 2 | +60%
+Aristobat,Poison 6; Multicast 3,Poison 8; Multicast 4,Poison 16; Multicast 8
+Aster,Heal 40 | adjacent Water +70 Heal permanently,Heal 40 | +105 Heal,Heal 160 | +315 Heal
+Cherubble,CD 2.0s Shield 100 | Protect 1,CD 1.3s Shield 100 | Protect 1,CD 1.3s Shield 100; Multicast 4 | Protect 1
+Cicadence,CD 3.0s Deal 100,CD 2.0s Deal 100,CD 2.0s Deal 200; Multicast 2
+Dirgefin,CD 4.5s Deal 50; Heal 100,CD 3.0s Deal 50; Heal 100,CD 3.0s Deal 100; Heal 200; Multicast 2
+Dracana,Deal 10 | Charge ally behind 2s,Deal 15 | Charge 3s,Deal 45 | Charge 18s
+Formiqueen,Deal 120 | adjacent Common +50% Cooldown Speed,Deal 180 | +75%,Deal 720 | +225%
+Humbolt,Deal 40; Shock 1; Multicast 3,Deal 45; Shock 1; Multicast 4,Deal 45; Shock 1; Multicast 8
+Ironcore,Deal 30 | Charge adjacent Electric 2s,Deal 30 | Charge 3s,Deal 30 | Charge 6s
+Lignite,Burn 3 | Damage = 48x Burn,Burn 3 | Damage = 72x Burn,Burn 3 | Damage = 144x Burn
+Magmalith,Burn 10 | +4 Burn to Fire ally above,Burn 15 | +6 Burn,Burn 30 | +24 Burn
+Noxalith,Poison 10 | +6 Poison to Toxic ally above,Poison 15 | +9 Poison,Poison 30 | +36 Poison
+Stalagrove,Shield 60 | Damage = 30% of shield received,Shield 60 | 45%,Shield 60 | 180%
+Thorntail,Deal 50; Poison 1 | +16 Damage when allies inflict Poison,Deal 50; Poison 1 | +24,Deal 150; Poison 1 | +96
+Aegistruct,Shield 150 | gain 2x adjacent allies' Shield,Shield 150 | 3x,CD 3.0s Shield 150 | 12x
+Blazewing,Burn 5; Multicast 5,Burn 5; Multicast 7,Burn 10; Multicast 28
+Celestia,Deal 260,Deal 390,Deal 3120
+Clawnetic,Deal 60; Multicast 2,Deal 60; Multicast 3,Deal 600; Multicast 24
+Coalem,Shield 1100; Burn 40,Shield 1650; Burn 60,CD 5.0s Shield 6600; Burn 240
+Dryadell,Deal 70; Multicast 2,Deal 70; Multicast 3,Deal 140; Multicast 12
+Fumungus,Poison 6 | Damage = 200% enemy Poison,Poison 6 | 300%,CD 1.5s Poison 12 | 1200%
+Prismagon,Deal 100 | +20 Damage per unique type,Deal 100 | +30,Deal 100 | +240
+Pylong,Deal 1; Shock 15 | ally behind +200% Shock,Deal 1; Shock 15 | +300%,Deal 1; Shock 15 | +2400%
+Reapra,CD 3.7s Deal 120 | Knockout enemy opposite,CD 2.5s Deal 120 | Knockout enemy opposite,CD 2.5s Deal 960 | Knockout a random enemy
+Shelldra,Deal 15; Heal 15; Multicast 3 | every 4.0s +2 Multicast,same | +3 Multicast,Deal 30; Heal 30; Multicast 6 | +12 Multicast
+Sirenade,Heal 200 | remove 35% debuffs,Heal 300 | remove 50%,Heal 1200 | remove 80%
+Zephyrex,Deal 100 | +2 Multicast to Flying ally in front,Deal 100 | +3 Multicast,Deal 800 | +12 Multicast
+Blixie,Burn 30 | give Fire ally behind 2x this Burn,Burn 30 | 3x,Burn 300 | 30x
+Cobrex,Poison 600,Poison 900,CD 2.0s Poison 900
+Draconarch,Deal 100; Multicast 2 | Cooldown +3 per cast,Deal 100; Multicast 3 | Cooldown +2 per cast,Deal 100; Multicast 24 | Cooldown +1 per cast
+Gaiadrasil,CD 4.5s | Damage = 100% of adjacent allies' Damage,CD 3.0s | 100%,CD 3.0s | 1000%
+Galvanine,Deal 20; Shock 12 | On Cast +50% Cooldown Speed and +4 Shock,Deal 30; Shock 18 | +50% and +6 Shock,Deal 30; Shock 144 | +50% and +48 Shock
+Geminiss,Shield 100 | adjacent allies +100% Shield,Shield 100 | +150%,Shield 1000 | +1500%
+Onsetra,Deal 200 | ally behind applies Ongoing 2 extra times,Deal 300 | 3 extra,Deal 3000 | 24 extra
+Saberhorn,Deal 100 | +2 Multicast to ally in front; own Cooldown +8s,Deal 100 | +3 Multicast,Deal 100 | +24 Multicast
+Stellagon,Deal 300 | adjacent no-ability allies +4 Multicast,Deal 450 | +6,Deal 4500 | +60
+Torrantler,Heal 200; Multicast 2,Heal 200; Multicast 3,Heal 200; Multicast 30

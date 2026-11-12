@@ -1,0 +1,25 @@
+name,ability,ed_championships,ed_games_played
+Black Belt,"After each battle, if you have exactly 1 Fighting monster on your team, activate its On Victory ability",0,0
+Bug Catcher,The first Bug monster you buy each day costs $10 less,2,3
+Burglar,"When you pick from a Trinket gift, also steal one of the other choices at random",2,4
+Chef,Your single-typed monsters gain Fire typing. Your Fire monsters have +2 Burn,1,2
+Chemist,"Your Toxic monsters have +3 Poison. When any monster levels up, increase this effect by +1 Poison",1,2
+Egg Breeder,Gain a Purple Egg that hatches into a level 2 Super Rare monster in 5 days,0,1
+Gamer,Gain a Mythical monster and $30 on day 8,1,2
+Gentleman,"Increase Income by $5. From day 4 onwards, your shop no longer stocks Common or Uncommon monsters",0,0
+Rich Lady,Gain shop rank +2 and $10,0,3
+Lucky Girl,SHINY monsters are more likely to appear,1,2
+Mad Scientist,"On day 7, transform monsters on your active team into random level 1 Legendary monsters",0,1
+Masked Man,"Every 4 days, choose a trainer and gain their ability",0,5
+Monster Ranger,Start with an Uncommon monster. Get another copy of that monster every 2 days,5,7
+Musician,"If you have exactly 1 Electric monster on your team, it will have +150% Shock",0,0
+Painter,Random species will be painted with every type this run,0,1
+Redhead,Your Fire monsters have +2 Burn for each victory,0,1
+Scavenger,Gain an additional copy of each non-unique Common or Uncommon Trinket from a gift,1,1
+Shopkeeper,Your shop stocks Item 1 rarity tier higher and cost 15% less,1,3
+Smuggler,Batomon from other regions appear in your shop and cost 35% less,0,1
+Swim Coach,Gain a random Water monster each day,4,5
+Treasure Hunter,"When you get Trinket gifts, your choices are 1 rarity tier higher",0,4
+Twins,"When monsters merge into level 3, gain an exact copy with a sell value of 0",1,3
+Witch,The first shop rolled each day contains a Potion,0,0
+Youngster,Gain 3 free rerolls every day,2,2

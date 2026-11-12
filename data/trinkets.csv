@@ -1,0 +1,78 @@
+name,rarity,effect
+Bargain Bin,Common,[Unique] The first Common monster you buy each day is free
+Boxing Glove,Common,On Victory: Your team gains +5 Damage permanently
+Gold Bracelet,Common,At the start of each day give a random monster +8 Sell Value
+Gold Nugget,Common,Increase Income by $3
+Gold Trophy,Common,On Victory: Gain $8
+Locked Box,Common,The next time you lose a battle gain a random non-unique Trinket of the highest rarity your shop rank allows
+Mini Duplicator,Common,Gain an additional copy of the next non-unique Trinket from a gift
+Plain Lure,Common,[Unique] Common monsters are more likely to appear in your shop
+Power Pouch,Common,When you buy an item give your monsters +2 Damage
+Quick Bell,Common,Monsters in your shop have +4% Cooldown Speed
+Quick Flag,Common,Your monsters in the leftmost column have +4% Cooldown Speed
+Sapphire Ring,Common,Monsters in your shop have +10% Heal
+Speed Whistle,Common,The next monster you buy has +12% Cooldown Speed
+Tempo Charm,Common,[Unique] On Battle Start: A random monster gains +4% Cooldown Speed permanently
+Topaz Ring,Common,Monsters in your shop have +10% Shield
+Echo Charm,Uncommon,[Unique] Your monsters' On Bought abilities activate an additional time
+Fire Bell,Uncommon,Fire monsters in your shop have +5 Burn
+Fire Orb,Uncommon,Your Fire monsters have +3 Burn
+Greedy Gloves,Uncommon,You can take all of the choices from your next Trinket gift
+Market License,Uncommon,Increase shop rank by 1
+Membership Card,Uncommon,You can use 1 additional Item each day
+Piggy Bank,Uncommon,[Unique] Gain +$1 for each $10 you have at the end of each day
+Poison Bell,Uncommon,Toxic monsters in your shop have +6 Poison
+Poison Orb,Uncommon,Your Toxic monsters have +3 Poison
+Power Band,Uncommon,Give the first monster you buy each day +20 Damage
+Power Crown,Uncommon,Your top middle monster has +20 Damage
+Rally Flag,Uncommon,On Battle Start: Your monsters in the leftmost column gain +12 Damage permanently
+Sea Crest,Uncommon,On Battle Start: Your monsters in the rightmost column gain +10% Heal permanently
+Small Club,Uncommon,Your monsters with a Cooldown of 5 seconds or above have +20% Damage
+Sweet Lure,Uncommon,[Unique] Common and Uncommon monsters are more likely to appear in your shop
+Training Weights,Common,+100 HP
+Treasure Map,Common,Your next Trinket gift choices are 1 rarity tier higher
+Wood Sword,Common,Your monsters have +5 Damage
+Bug Net,Uncommon,[Unique] Bug monsters in the shop cost 3 less
+Earth Crest,Uncommon,On Battle Start: Your monsters in the rightmost column gain +10% Shield permanently
+Ancient Plume,Rare,[Unique] On Battle Start: If you only have 1 monster give it +1 Multicast permanently and destroy this
+Arcade Coins,Rare,[Unique] Gain 10 free rerolls
+Blue Incense,Rare,The next 5 shops will contain only Rare monsters
+Fool's Gold,Rare,[Unique] Increase Income by $15. The shop no longer stocks Items
+Link Cable,Rare,[Unique] All of your team's monsters are now considered adjacent to each other
+Mega Duplicator,Rare,Gain 2 additional copies of the next non-unique Trinket from a gift
+Metal Bat,Rare,[Unique] On Battle Start: Your monster with the highest Cooldown gains +50% Damage for this battle
+Power Bell,Rare,Monsters in your shop have +25 Damage
+Rigged Dice,Rare,[Unique] The first shop each day stocks only the rarest monsters and items your shop rank allows
+Sapphire Amulet,Rare,You receive 25% more Heal
+Scrap Sword,Rare,Your monsters have +2 Damage for each Common Trinket you have
+Silver Watch,Rare,When a monster levels up from a merge it gains +12% Cooldown Speed
+Speed Crest,Rare,Your monsters in the rightmost column have +15% Cooldown Speed
+Terrarium,Rare,Your Bug monsters have +20% Damage
+Topaz Amulet,Rare,You receive 25% more Shield
+Warhorn,Rare,On Battle Start: Your monsters gain +10 Damage permanently
+Blitz Bell,Super Rare,Monsters in your shop have +25% Cooldown Speed
+Echo Bell,Super Rare,[Unique] When you buy a 0 cost item use it an additional time
+Grow Lamp,Super Rare,[Unique] Your Grass monsters only need 2 copies to reach level 2
+Haste Crown,Super Rare,Your top middle monster has +20% Cooldown Speed
+Haste Orb,Super Rare,Your monsters have +10% Cooldown Speed
+Momentum Flag,Super Rare,On Battle Start: Your monsters in the leftmost column gain +8% Cooldown Speed permanently
+Mysterious Mask,Super Rare,Choose a trainer and gain their ability
+Purple Incense,Super Rare,The next 5 shops will contain only Super Rare monsters
+Razor Beak,Super Rare,Your Flying monsters have +1 Multicast
+Repeater Charm,Super Rare,[Unique] Your monsters' On Battle Start abilities activate an additional time
+Rocket Boots,Super Rare,[Unique] Monsters in your shop gain Flying typing
+Upgrade Disc,Super Rare,When you buy a monster level it up and destroy this
+VIP Pass,Super Rare,[Unique] Your shop no longer stocks anything Common or Uncommon
+Barbell,Legendary,+5000 HP
+Candy Jar,Legendary,[Unique] On Battle Start: Your Common and Uncommon monsters permanently level up to level 3
+Fancy Sword,Legendary,Your monsters have +3% Damage for each Trinket you have
+Giant Club,Legendary,Your monsters with a Cooldown of 5 seconds or above have +70% stats (except Cooldown and Multicast)
+Gold Incense,Legendary,The next 5 shops will contain only Legendary monsters
+Metronome,Legendary,When your monsters cast they gain +10 Damage for this battle
+Mighty Bell,Legendary,Monsters in your shop have +300 Damage
+Mysterious Chest,Legendary,[Unique] On Battle Lost: Gain a random non-unique Legendary Trinket
+Winged Crown,Legendary,[Unique] Your top middle monster has +1 Multicast
+Zenith Stone,Legendary,When your monsters gain stats they gain +80% more (except Multicast and % bonuses)
+Alpha Crown,Mythical,[Unique] On Battle Start: Your monsters' Damage is set to your top-middle monster's Damage for this battle
+Mega Upgrade Disc,Mythical,When a monster reaches level 3 level it up again and destroy this
+(6 more Mythical trinkets are locked in Ed's Batopedia and show as ???),,

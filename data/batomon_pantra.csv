@@ -1,0 +1,65 @@
+name,cost,rarity,types,cooldown_s,active,passive
+Bumblebolt,10,Common,Bug/Electric,2.5,Deal 3 damage; Shock 1,
+Dribblet,10,Common,Water,3.0,Heal 20,Evolves at level 3
+Guardiant,15,Common,Bug,4.0,Deal 15 damage,After you buy a Bug monster this gains +8 Damage
+Joltail,15,Common,Electric,4.5,Deal 1 damage; Shock 4,
+Magmite,15,Common,Fire/Rock,4.5,Shield 40; Burn 4,
+Mosslug,10,Common,Water/Grass,6.0,Heal 30,On Cast: +20 Damage for this battle
+Panbud,10,Common,Grass,5.0,Deal 25 damage,Evolves at level 3
+Pebbler,15,Common,Rock,5.0,Shield 20,On Cast: +15 Shield for this battle
+Scorchimp,10,Common,Fire,6.0,Deal 5 damage; Burn 5,Evolves at level 3
+Spinarai,10,Common,Bug/Toxic,2.5,Deal 3 damage; Poison 1,
+Stingarde,10,Common,Bug,6.0,Deal 150 damage,On Cast: Knockout self
+Velocect,15,Common,Bug/Flying,3.5,Deal 15 damage; Multicast 2,
+Venopuff,15,Common,Toxic,3.5,Poison 4,
+Berroon,20,Uncommon,Grass,4.0,Deal 40 damage,On Battle Start: The next 1 items in your shop will be Berries
+Boomagon,30,Uncommon,Dragon,7.0,Deal 40 damage,On Cast: Give the ally behind +3% Cooldown Speed permanently
+Brawlmantis,30,Uncommon,Bug/Fighting,5.5,Deal 50 damage,On Victory: This and Common allies gain +10 Damage permanently
+Cinderfly,25,Uncommon,Bug/Fire,5.0,Burn 7,After you buy a Bug monster this gains +10% Cooldown Speed
+Craghorn,25,Uncommon,Grass/Rock,6.0,Deal 20 damage; Shield 20,When you use an item this gains +20 Damage and Shield
+Electranade,25,Uncommon,Electric,4.5,Shock 25,On Cast: Knockout self
+Frizzly,25,Uncommon,Electric,7.0,Deal 1 damage; Shock 8,On Battle Start: Trigger this
+Gildshell,25,Uncommon,Bug,2.0,Deal 1 damage,At the start of each day this gains +20 Sell Value permanently if it is on your team
+Noxnimbus,25,Uncommon,Toxic,3.5,Poison 1,On Cast: Adjacent Toxic allies gain +3 Poison for this battle
+Plunderbird,30,Uncommon,Water/Flying,5.0,Deal 1 damage; Heal 25; Multicast 2,On Cast: Gain $1
+Puffloon,30,Uncommon,Toxic/Water,10.0,Heal 10; Poison 1,Trigger this when adjacent Toxic allies trigger (except other Puffloon)
+Pyronade,25,Uncommon,Fire,4.5,Burn 20,On Cast: Knockout self
+Runerock,20,Uncommon,Rock,8.0,Shield 140,On Cast: Remove 15 stacks of every debuff on your team
+Shogapede,30,Uncommon,Bug/Toxic,5.0,Poison 6,After you buy a Bug monster this gains +10% Cooldown Speed
+Aristobat,25,Rare,Toxic/Flying,4.0,Poison 4; Multicast 2,
+Aster,40,Rare,Water,3.0,Heal 40,On Battle Start: Adjacent Water allies gain +35 Heal permanently
+Cherubble,25,Rare,Rock,4.0,Shield 100,On Cast: Give adjacent allies Protect 1
+Cicadence,25,Rare,Bug,6.0,Deal 100 damage,On Cast: Trigger the Bug ally above
+Dirgefin,25,Rare,Ghost/Water,9.0,Deal 50 damage; Heal 100,On Cast: Knockout all Common allies and enemies
+Dracana,40,Rare,Dragon,3.0,Deal 5 damage,On Cast: Charge the ally behind by 1 second(s) (Dracana can't receive charge)
+Formiqueen,25,Rare,Bug,4.0,Deal 60 damage,Ongoing: Adjacent Common allies have +25% Cooldown Speed
+Humbolt,25,Rare,Electric/Flying,4.0,Deal 30 damage; Shock 1; Multicast 2,
+Ironcore,40,Rare,Steel,2.0,Deal 30 damage,On Cast: Charge adjacent Electric allies by 1 second(s) (Ironcore can't receive charge)
+Lignite,30,Rare,Fire,5.0,Burn 3,Ongoing: Has additional Damage equal to 24 times this monster's Burn
+Magmalith,30,Rare,Fire,9.0,Burn 5,On Cast: Give the Fire ally above +2 Burn permanently
+Noxalith,30,Rare,Toxic,7.0,Poison 5,On Cast: Give the Toxic ally above +3 Poison permanently
+Stalagrove,35,Rare,Grass/Rock,4.5,Shield 60,When you receive shield this gains Damage for this battle equal to 15% of the amount shielded
+Thorntail,35,Rare,Grass/Toxic,6.0,Deal 50 damage; Poison 1,When allies inflict Poison this gains +8 Damage permanently
+Aegistruct,45,Super Rare,Rock,6.0,Shield 150,On Battle Start: Gain Shield for this battle equal to the Shield of adjacent allies (except other Aegistruct)
+Blazewing,35,Super Rare,Fire/Flying,5.0,Burn 5; Multicast 3,
+Celestia,30,Super Rare,Dragon,6.5,Deal 130 damage,On Battle Start: Disable abilities of all Ongoing monsters in this row
+Clawnetic,45,Super Rare,Steel,3.0,Deal 60 damage,Whenever an ally inflicts Shock Charge this by 1.0 second(s)
+Coalem,45,Super Rare,Fire/Rock,15.0,Shield 550; Burn 20,On Battle Start: Trigger this
+Dryadell,45,Super Rare,Grass,6.0,Deal 70 damage,On Cast: Trigger the Grass ally above
+Fumungus,40,Super Rare,Grass/Toxic,3.0,Poison 6,Ongoing: Has additional Damage equal to 100% of the Poison stacks on the enemy
+Prismagon,45,Super Rare,Dragon,4.0,Deal 100 damage,On Cast: +10 Damage permanently for each unique type on your team
+Pylong,40,Super Rare,Electric,7.0,Deal 1 damage; Shock 15,Ongoing: Ally behind has +100% Shock
+Reapra,35,Super Rare,Ghost,7.5,Deal 120 damage,On Cast: Knockout the enemy opposite of this
+Shelldra,40,Super Rare,Water/Dragon,4.5,Deal 15 damage; Heal 15; Multicast 3,Every 4.0 seconds +1 Multicast for this battle
+Sirenade,40,Super Rare,Water,4.0,Heal 100,On Cast: Remove 20% of debuffs on your team
+Zephyrex,60,Super Rare,Flying,10.0,Deal 100 damage,On Cast: Give the Flying ally in front +1 Multicast permanently (Zephyrex can't have Multicast)
+Blixie,55,Legendary,Fire,6.0,Burn 30,On Cast: Give the Fire ally behind this monster's Burn for this battle
+Cobrex,50,Legendary,Toxic,15.0,Poison 300,Whenever an ally inflicts Poison Charge this by 1 second(s)
+Draconarch,60,Legendary,Dragon,5.0,Deal 100 damage,On Cast: Activate the On Battle Start abilities of adjacent allies and increase this monster's Cooldown by 6 for this battle
+Gaiadrasil,60,Legendary,Grass,9.0,,Ongoing: Has additional Damage equal to 100% of the total Damage of adjacent allies (except other Gaiadrasil)
+Galvanine,40,Legendary,Electric,7.0,Deal 10 damage; Shock 6,On Cast: +50% Cooldown Speed and +2 Shock for this battle
+Geminiss,50,Legendary,Rock,10.0,Shield 100,On Cast: Give adjacent allies +50% Shield for this battle
+Onsetra,50,Legendary,Dragon,4.0,Deal 100 damage,The ally behind applies its Ongoing abilities 1 additional time(s)
+Saberhorn,60,Legendary,Dragon,8.0,Deal 100 damage,On Cast: Give the ally in front +1 Multicast and increase this monster's Cooldown by 8 seconds for this battle
+Stellagon,50,Legendary,Dragon,6.0,Deal 150 damage,Ongoing: Adjacent allies with no abilities have +2 Multicast
+Torrantler,50,Legendary,Water,7.0,Heal 200,On Cast: Trigger adjacent Water allies (except other Torrantler)

@@ -1,0 +1,40 @@
+name,cost,rarity,effect
+Cake,0,Common,Give 2 random monsters +5 Damage
+Coupon,0,Common,Reduce the cost of monsters in your shop by 3
+Fake Coin,0,Common,Gain 1 free reroll
+Gray Chip,0,Common,If you win the next battle gain $15
+Green Stone,0,Common,Transform a random Common monster into an Uncommon monster
+Voucher,5,Common,Buy a random monster from the shop for free
+Apex Bait,20,Uncommon,Rank up the shop
+Dowsing Rod,15,Uncommon,Choose a Common Trinket gift
+Feast,0,Uncommon,Give your monsters +5 Damage
+Gray Ticket,0,Uncommon,Reroll a shop with all Common monsters
+Green Ticket,0,Uncommon,Reroll a shop with all Uncommon monsters
+Nana Berry,1,Uncommon,Give the bottom right monster +5% Cooldown Speed. You can use 1 more item today
+Pom Berry,1,Uncommon,Give the bottom right monster +8 Damage. You can use 1 more item today
+Red Coin,0,Uncommon,+$20 and lose 1 life
+Basic Candy,30,Rare,Level up a random level 1 Common or Uncommon monster
+Battery Pack,0,Rare,Give your Electric monsters +1 Shock
+Black Sludge,0,Rare,Give your Toxic monsters +1 Poison
+Blue Ticket,0,Rare,Reroll a shop with all Rare monsters
+Gold Powder,5,Rare,Give a random monster +20 Sell Value
+Hot Pepper,0,Rare,Give your Fire monsters +1 Burn
+Shiny Pebble,0,Rare,Give your Rock monsters +20 Shield
+Lootbox,30,Super Rare,Get a random Legendary monster
+Purple Gift,40,Super Rare,Gain a random Super Rare Trinket
+Purple Ticket,0,Super Rare,Reroll a shop with all Super Rare monsters
+Recruiting Flyer,90,Super Rare,Get a random level 3 Uncommon monster
+Tote Bag,5,Super Rare,You can use 2 more items today
+Golden Gift,50,Legendary,Gain a random Legendary Trinket
+Golden Ticket,0,Legendary,Reroll a shop with all Legendary monsters
+Magic Lasso,50,Legendary,Gain an exact copy of the enemy's top middle Batomon in the next battle
+Rare Candy,40,Legendary,Level up a random level 1 monster
+Black Feather,30,Mythical,Give 1 random monsters +1 Multicast
+Crimson Gift,70,Mythical,Gain a random Mythical Trinket
+Crimson Ticket,30,Mythical,Reroll a shop with all Mythical monsters
+Shiny Berry,1,Mythical,Turn a random monster SHINY. You can use 1 more item today
+Ultra Candy,60,Mythical,Level up a random level 3 monster
+Lucky Coin,0,Rare,Gain $3. You can use 1 more item today
+Mystic Pearl,0,Rare,Give your Water monsters +15 Heal
+Coffee,5,Super Rare,"At the start of the next battle, Batomon On Battle Start abilities activate an additional time"
+Focus Pill,0,Super Rare,Your monsters with no abilities gain +15% Cooldown Speed

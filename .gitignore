@@ -1,0 +1,21 @@
+# Python environment and caches
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Screen captures (large, regenerated while playing)
+captures/
+
+# Run and action logs written by play.py
+logs/
+
+# Temporary and editor files
+*.tmp
+*.log
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
