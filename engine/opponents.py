@@ -13,11 +13,11 @@ three skill levels:
 Merges give the ghost a trinket of the merged monster's rarity (random), so late
 opponents carry trinkets like real ones. One ghost run gives one team per day.
 
-The mix of skills is the calibration knob (POOL_MIX). It was set so that the bot's
-old simple rules come out near their real record (11 losses in 14 battles on
-2026-11-11) and the day-by-day enemy damage roughly matches the older repo's
-fight data (enemy top monster ~900 on day 5, ~2,400 on day 8). When the bot starts
-logging real opponent teams, add them with `add_recorded()` and they join the pool.
+The calibration knobs are POOL_MIX, EXTRA_INCOME and POWER_RAMP. They were set on
+2026-11-12 so that the teams of the first live engine run (runs/2026-11-12-chef) score
+close to their real results (won Days 1-6, lost Days 7-11) and the old simple rules win
+about as often as they did for real (3 of 14 battles). When the bot starts logging real
+opponent teams, add them with `add_recorded()` and they join the pool.
 """
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ import json
 import random
 from pathlib import Path
 
-from . import data, model
+from . import data, growth, model
 from .arrange import heuristic_layout, power
 from .evaluate import slot_spec
 from .model import RunState
@@ -33,7 +33,8 @@ from .model import RunState
 POOL_MIX = {"casual": 0.15, "steady": 0.35, "strong": 0.30, "expert": 0.20}
 # Extra money per day for ghosts, standing in for what they get from items, events,
 # trainer abilities and economy trinkets (none of which the ghosts model).
-EXTRA_INCOME = {"casual": 0, "steady": 10, "strong": 20, "expert": 30}
+POWER_RAMP = 0.3
+EXTRA_INCOME = {"casual": 0, "steady": 20, "strong": 35, "expert": 50}
 RECORDED = Path(__file__).resolve().parent.parent / "data" / "opponents_recorded.jsonl"
 
 
@@ -94,6 +95,19 @@ def _ghost_trinket(rarity: str, rng: random.Random) -> str | None:
     return rng.choice(opts) if opts else None
 
 
+def _ramped(spec: dict, day: int) -> dict:
+    """Scale a ghost's numbers up from day 5 on (POWER_RAMP per day). Ghosts miss what
+    real players get from trainers, events, item scalers and well-built amplifier
+    combos; without this the engine thought a weak late board was safe."""
+    f = 1.0 + POWER_RAMP * max(0, day - 4)
+    if f == 1.0:
+        return spec
+    out = dict(spec)
+    out["slots"] = [None if sl is None else {**sl, "stats": {k: round(v * f) for k, v in sl["stats"].items()}}
+                    for sl in spec["slots"]]
+    return out
+
+
 def ghost_run(seed: int, days: int, skill: str) -> list[dict]:
     """Play one ghost run; return its team spec for every day 1..days."""
     rng = random.Random(seed)
@@ -127,8 +141,11 @@ def ghost_run(seed: int, days: int, skill: str) -> list[dict]:
                     d = u.stat_dict()
                     d["damage"] += 10 * u.level
                     s.set_slot(w, i, u.with_stats(d))
-        out.append({"trainer": "", "day": day, "hp": data.hp_for_day(day), "skill": skill,
-                    "trinkets": list(s.trinkets), "slots": [slot_spec(u) for u in s.team]})
+        spec = {"trainer": "", "day": day, "hp": data.hp_for_day(day), "skill": skill,
+                "trinkets": list(s.trinkets), "slots": [slot_spec(u) for u in s.team]}
+        out.append(_ramped(spec, day))
+        # the ghost's monsters keep what they grow permanently in its battle
+        s.team = growth.after_mirror_battle(s.team, spec)
     return out
 
 

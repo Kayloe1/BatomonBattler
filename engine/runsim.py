@@ -27,7 +27,7 @@ from dataclasses import asdict
 
 from sim.battle import simulate
 
-from . import data, model, opponents
+from . import data, growth, model, opponents
 from .arrange import power
 from .evaluate import Evaluator, team_spec
 from .planner import Params, Planner
@@ -115,6 +115,8 @@ def play_run(seed: int, policy: str, params: Params | None = None, pool_n: int =
         o["hp"] = data.hp_for_day(day)
         r = simulate(mine, o, seed=rng.randrange(1 << 30)) if any(mine["slots"]) else None
         won = r is not None and r.winner == "a"
+        if r is not None:
+            s.team = growth.carry(s.team, r.units[0])
         if won:
             s.badges += 1
         else:

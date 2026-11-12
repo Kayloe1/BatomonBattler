@@ -51,16 +51,18 @@ class Score:
     win: float
     margin: float
     n: int
+    margin_weight: float = MARGIN_WEIGHT
 
     @property
     def value(self) -> float:
-        return self.win + MARGIN_WEIGHT * self.margin
+        return self.win + self.margin_weight * self.margin
 
 
 class Evaluator:
     """Plays teams against opponent pools; caches every result."""
 
-    def __init__(self, pools: dict[int, list[dict]], seeds: int = 1):
+    def __init__(self, pools: dict[int, list[dict]], seeds: int = 1, margin_weight: float = MARGIN_WEIGHT):
+        self.margin_weight = margin_weight
         self.pools = pools
         self.seeds = seeds
         self.cache: dict[tuple, tuple[float, float]] = {}
@@ -106,4 +108,4 @@ class Evaluator:
                 n += 1
         if n == 0:
             return Score(0.0, 0.0, 0)
-        return Score(wins / n, margin / n, n)
+        return Score(wins / n, margin / n, n, self.margin_weight)
