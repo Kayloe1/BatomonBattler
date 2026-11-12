@@ -259,3 +259,50 @@ class Robustness(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FromLogs(unittest.TestCase):
+    """A logged battle (as play.py writes it) becomes a simulator case."""
+
+    def _log(self, tmp, records):
+        import json
+        p = Path(tmp) / "run_test.jsonl"
+        p.write_text("\n".join(json.dumps(r) for r in records), encoding="utf-8")
+        return p
+
+    def test_day2_read_from_the_battle_screen_matches_the_hand_made_case(self):
+        import json
+        import tempfile
+        from sim import from_logs
+        seen = json.loads((Path(__file__).parent / "fixtures" / "battle_day2_seen.json").read_text())
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._log(tmp, [
+                {"kind": "trainer", "ok": True},
+                {"kind": "trinket", "ok": True, "offered": ["Rally Flag", "Wood Sword"], "picked": 1},
+                {"kind": "battle", "time": "t", "day": 2, "trainer": "Rich Lady", "trainer_hp": 500, "seen": seen},
+                {"kind": "day_result", "day": 2, "badges": 1, "lives": 0},
+            ])
+            cases = from_logs.battles_from_log(path)
+        self.assertEqual(len(cases), 1)
+        c = cases[0]
+        self.assertEqual((c["result"], c["problems"], c["a"]["trinkets"]), ("win", [], ["Wood Sword"]))
+        hand = json.loads((ROOT / "sim" / "cases" / "day2_rich_lady_win.json").read_text())
+        self.assertEqual(c["a"]["slots"], hand["a"]["slots"])
+        self.assertEqual(c["b"]["slots"], hand["b"]["slots"])
+        c["a"]["trinkets"] = []
+        res = from_logs.check([c], seeds=1)
+        self.assertEqual((res["usable"], res["agree"]), (1, 1))
+
+    def test_unnamed_opponent_is_skipped_not_guessed(self):
+        import tempfile
+        from sim import from_logs
+        seen = {"my_team": [{"name": "Mosslug", "level": 1, "stats": []}] + [None] * 5,
+                "opponent_team": [{"name": None, "level": 2, "stats": [{"stat": "damage", "value": 40}]}] + [None] * 5,
+                "problems": []}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._log(tmp, [{"kind": "battle", "day": 1, "seen": seen},
+                                   {"kind": "day_result", "badges": 0, "lives": -1}])
+            cases = from_logs.battles_from_log(path)
+        self.assertEqual(cases[0]["result"], "loss")
+        self.assertIn("opponent slot 1 not named", cases[0]["problems"])
+        self.assertEqual(from_logs.check(cases)["skipped"], 1)

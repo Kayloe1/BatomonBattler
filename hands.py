@@ -41,6 +41,7 @@ class Result:
     before: dict | None = None
     after: dict | None = None
     clicks: list = field(default_factory=list)
+    battle: dict | None = None        # battle(): both teams as read at the start
 
 
 # ------------------------------------------------- checks (pure functions) ----
@@ -349,6 +350,11 @@ class Hands:
         while time.time() - start < timeout:
             state = self.look(save_if_unreadable=False)
             screen = state["screen"]
+            if screen == "battle":
+                # keep an early frame of the battle: both teams with their starting badges
+                self._battle_frames = getattr(self, "_battle_frames", 0) + 1
+                if self._battle_frames == 2:
+                    self.battle_start_image = self.last_image
             if screen in wanted:
                 hits += 1
                 if hits >= 2:
@@ -388,8 +394,41 @@ class Hands:
         return self._log(name, Result(ok, f"now on '{after.get('screen')}'", before, after, clicks))
 
     def battle(self) -> Result:
-        """Press BATTLE! and watch until the result box shows."""
-        return self._press_and_wait("battle", "shop", reader.BATTLE_BUTTON, {"result"}, 300)
+        """Press BATTLE! and watch until the result box shows.
+
+        An early frame of the battle is kept and read after the battle (reading both teams
+        takes a few seconds): result.battle holds both teams, as reader.read_battle()
+        returns them, and where the start and result captures were saved.
+        """
+        self._battle_frames = 0
+        self.battle_start_image = None
+        r = self._press_and_wait("battle", "shop", reader.BATTLE_BUTTON, {"result"}, 300)
+        if not self.dry_run:
+            r.battle = self._record_battle(r.ok)
+        return r
+
+    def _record_battle(self, reached_result: bool) -> dict:
+        folder = CAPTURE_DIR / "battles"
+        folder.mkdir(parents=True, exist_ok=True)
+        stamp = f"{datetime.now():%Y%m%d_%H%M%S}"
+        out: dict = {"start_capture": None, "result_capture": None}
+        if reached_result and self.last_image is not None:
+            path = folder / f"{stamp}_result.png"
+            self.last_image.save(path)
+            out["result_capture"] = str(path.relative_to(ROOT))
+        img = self.battle_start_image
+        if img is None:
+            out["problems"] = ["no battle frame was seen"]
+            return out
+        path = folder / f"{stamp}_start.png"
+        img.save(path)
+        out["start_capture"] = str(path.relative_to(ROOT))
+        import numpy as np
+        try:
+            out.update(reader.read_battle(np.asarray(window.canonical_picture(img))))
+        except Exception as e:     # a reading bug must not stop the run; the capture is kept
+            out["problems"] = [f"battle screen not read: {type(e).__name__}: {e}"]
+        return out
 
     def confirm_result(self) -> Result:
         """Press CONFIRM on the result box; the next shop, an event or the end of the run follows."""
