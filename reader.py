@@ -724,6 +724,214 @@ def read_battle(pic: np.ndarray) -> dict:
     return {"my_team": teams[0], "opponent_team": teams[1], "problems": problems}
 
 
+# ------------------------------------------------ Stats window and end HP ----
+# The Stats window (opened from the result box) lists, for each of the 6 slots of "MY TEAM" and
+# of "OPPONENT TEAM", lines such as "Dealt 150 damage", "Healed 120 HP", "Inflicted 20 Poison"
+# and "Triggered 3 time(s)". Each kind of line has its own colour. The opponent team sits below
+# the window's edge until it is scrolled.
+
+STATS_LINE_COLOURS = {"dealt": (239, 66, 107), "inflicted": (123, 87, 161),
+                      "healed": (87, 138, 201), "triggered": (121, 174, 208)}
+STATS_BORDER = (156, 156, 173)
+STATS_VIEW_Y = (250, 1318)       # the part of the window that shows cards (the rest is frame)
+STATS_CARD_TOP_GAP, STATS_CARD_H, STATS_ROW_PITCH = 19, 237, 260
+STATS_SPRITE_W = 170             # left part of a card, where the monster's picture sits
+STATS_WORD_GAP = 7               # columns of empty space that separate words
+STATS_SCROLL_POINT: Box = (1200, 700, 1300, 760)
+KNOWN_STATUSES = ["Poison", "Shock", "Burn"]
+
+
+def stats_headers(pic: np.ndarray) -> list[tuple[int, int]]:
+    """y ranges of the yellow section headers (MY TEAM, OPPONENT TEAM) that are visible."""
+    col = _near(pic[STATS_VIEW_Y[0] - 60:STATS_VIEW_Y[1], 1500], YELLOW, 12)
+    out, y = [], 0
+    while y < len(col):
+        if col[y]:
+            start = y
+            while y < len(col) and col[y]:
+                y += 1
+            if y - start >= 30:
+                out.append((STATS_VIEW_Y[0] - 60 + start, STATS_VIEW_Y[0] - 60 + y))
+        else:
+            y += 1
+    return out
+
+
+def _stats_cell_edges(pic: np.ndarray, top: int) -> list[tuple[int, int]]:
+    """x ranges of the cards in the row whose top is at y=top (found from their grey borders)."""
+    band = _near(pic[top + 40:top + STATS_CARD_H - 40, 250:2290], STATS_BORDER, 10)
+    cols = band.mean(axis=0) >= 0.9
+    lines, x = [], 0
+    while x < len(cols):
+        if cols[x]:
+            s = x
+            while x < len(cols) and cols[x]:
+                x += 1
+            lines.append((250 + s, 250 + x))
+        else:
+            x += 1
+    # a card has a left and a right line; neighbouring cards have a gap between their lines
+    cells = [(a[1], b[0]) for a, b in zip(lines, lines[1:]) if b[0] - a[1] > 300]
+    return cells
+
+
+def _stats_bands(rgb: np.ndarray) -> list[tuple[str, list[list[glyphs.Glyph]]]]:
+    """The text lines of one card (the part right of the picture) as (kind, words of glyphs)."""
+    anyline = np.zeros(rgb.shape[:2], dtype=bool)
+    for c in STATS_LINE_COLOURS.values():
+        anyline |= _near(rgb, c, 12)
+    rows = np.nonzero(anyline.any(axis=1))[0]
+    if not len(rows):
+        return []
+    bands, start, prev = [], rows[0], rows[0]
+    for y in rows[1:]:
+        if y - prev > 3:
+            bands.append((start, prev + 1))
+            start = y
+        prev = y
+    bands.append((start, prev + 1))
+    out = []
+    for y0, y1 in bands:
+        band = rgb[y0:y1]
+        kind = max(STATS_LINE_COLOURS, key=lambda k: _near(band, STATS_LINE_COLOURS[k], 12).sum())
+        mask = _near(band, STATS_LINE_COLOURS[kind], 12)
+        words, cur = [], []
+        for g in glyphs.segment(mask, min_pixels=4):
+            if cur and g.x0 - cur[-1].x1 >= STATS_WORD_GAP:
+                words.append(cur)
+                cur = []
+            cur.append(g)
+        if cur:
+            words.append(cur)
+        out.append((kind, words))
+    return out
+
+
+def stats_card_images(pic: np.ndarray) -> dict[tuple[int, int], np.ndarray]:
+    """(header, slot) -> the text part of each visible card (used by teach.py)."""
+    out = {}
+    heads = stats_headers(pic)
+    for h, (hy0, hy1) in enumerate(heads):
+        for row in range(2):
+            top = hy1 + STATS_CARD_TOP_GAP + STATS_ROW_PITCH * row
+            if top < STATS_VIEW_Y[0] or top + STATS_CARD_H > STATS_VIEW_Y[1]:
+                continue
+            for col, (x0, x1) in enumerate(_stats_cell_edges(pic, top)):
+                out[(h, row * 3 + col)] = pic[top + 8:top + STATS_CARD_H - 8, x0 + 8 + STATS_SPRITE_W:x1 - 8]
+    return out
+
+
+def _stats_lines(rgb: np.ndarray, problems: list[str], where: str) -> dict:
+    """Read the text lines of one card (the part right of the monster picture)."""
+    out: dict = {}
+    for kind, words in _stats_bands(rgb):
+        if len(words) < 2:
+            problems.append(f"{where}: cannot split a '{kind}' line into words")
+            continue
+        digits = "".join(store().classify("statsdigit", g.bitmap)[0] for g in words[1])
+        value = _to_int(digits)
+        if value is None:
+            problems.append(f"{where}: cannot read the number of a '{kind}' line ('{digits}')")
+        if kind == "inflicted":
+            raw = "".join(store().classify("statsword", g.bitmap)[0] for g in words[2]) if len(words) > 2 else ""
+            status = resolve(raw, KNOWN_STATUSES, ignore_case=True) or (raw if raw and "?" not in raw else None)
+            if status is None:
+                problems.append(f"{where}: unknown status word '{raw}'")
+                status = raw or "?"
+            out.setdefault("inflicted", {})[status] = value
+        else:
+            out[kind] = value
+    return out
+
+
+def read_stats_window(pic: np.ndarray) -> dict:
+    """Every card visible in the Stats window: {"cells": [{"section", "row", "col", "present",
+    "lines"}], "headers": n, "problems": [...]}.
+
+    section is "my" for cards under the first header and "opponent" for cards under the last one
+    (the window starts scrolled to the top, so the first header seen there is MY TEAM; once scrolled
+    down only the opponent's header is left, which read_stats() relies on).
+    """
+    problems: list[str] = []
+    heads = stats_headers(pic)
+    cells = []
+    for h, (hy0, hy1) in enumerate(heads):
+        for row in range(2):
+            top = hy1 + STATS_CARD_TOP_GAP + STATS_ROW_PITCH * row
+            if top < STATS_VIEW_Y[0] or top + STATS_CARD_H > STATS_VIEW_Y[1]:
+                continue                       # off the visible part of the window
+            nxt = heads[h + 1][0] if h + 1 < len(heads) else 10 ** 9
+            if top + STATS_CARD_H > nxt:
+                continue
+            edges = _stats_cell_edges(pic, top)
+            if len(edges) != 3:
+                problems.append(f"stats: found {len(edges)} cards (not 3) in row {row} under header {h}")
+                continue
+            for col, (x0, x1) in enumerate(edges):
+                card = pic[top + 8:top + STATS_CARD_H - 8, x0 + 8:x1 - 8]
+                sprite = card[:, :STATS_SPRITE_W]
+                present = bool((sprite.min(axis=2) < 215).mean() > 0.02)
+                where = f"stats header {h} row {row} col {col}"
+                lines = _stats_lines(card[:, STATS_SPRITE_W:], problems, where)
+                cells.append({"header": h, "headers": len(heads), "row": row, "col": col,
+                              "slot": row * 3 + col, "present": present or bool(lines), "lines": lines})
+    return {"cells": cells, "headers": len(heads), "problems": problems}
+
+
+def read_stats(top_pic: np.ndarray, scrolled_pic: np.ndarray | None) -> dict:
+    """Both teams' stats: {"my_team": [6 x lines-or-None], "opponent_team": [...], "problems": [...]}.
+
+    top_pic is the window as it opens, scrolled_pic the same window scrolled to the bottom.
+    My team is read from the first header of top_pic; the opponent's from the last header of
+    scrolled_pic (both rows are visible there), or from top_pic if scrolling failed and the row fits.
+    """
+    a = read_stats_window(top_pic)
+    problems = list(a["problems"])
+    my: list = [None] * 6
+    opp: list = [None] * 6
+    for c in a["cells"]:
+        if c["header"] == 0 and c["headers"] >= 1:
+            my[c["slot"]] = c["lines"] if c["present"] else None
+    sources = [read_stats_window(scrolled_pic)] if scrolled_pic is not None else []
+    sources.append(a)
+    got = set()
+    for src in sources:
+        problems += [p for p in src["problems"] if p not in problems]
+        for c in src["cells"]:
+            last = c["header"] == c["headers"] - 1 and (c["headers"] >= 2 or src is not a)
+            if last and c["slot"] not in got:
+                opp[c["slot"]] = c["lines"] if c["present"] else None
+                got.add(c["slot"])
+        if len(got) == 6:
+            break
+    if len(got) < 6:
+        problems.append(f"stats: opponent slots seen {sorted(got)} of 0-5 (scroll may have failed)")
+    return {"my_team": my, "opponent_team": opp, "problems": problems}
+
+
+# End of battle: the HP bars on the (dimmed) result screen. The bar fills from the left.
+RESULT_BARS = {"me": (564, 1160), "opponent": (1488, 2084)}      # x range of each bar's track
+RESULT_BAR_Y = 336
+
+
+def read_result_hp(pic: np.ndarray) -> dict:
+    """Fraction of HP each trainer has left at the end of the battle (0.0 to 1.0).
+
+    Measured as the width of the coloured part of the bar; multiply by the trainer's HP.
+    """
+    out = {}
+    row = pic[RESULT_BAR_Y].astype(int)
+    for side, (x0, x1) in RESULT_BARS.items():
+        seg = row[x0:x1]
+        neutral = (seg.max(axis=1) - seg.min(axis=1)) <= 3          # empty track is plain grey
+        filled = ~neutral
+        n = 0
+        while n < len(filled) and filled[n]:
+            n += 1
+        out[side] = round(n / (x1 - x0), 3)
+    return out
+
+
 # ------------------------------------------------------------ slot reads ----
 
 def owned_badge_band(box: Box) -> Box:

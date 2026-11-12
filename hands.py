@@ -221,6 +221,17 @@ class Hands:
             pyautogui.moveTo(*self.screen_point(PARK), duration=0.15)
         return [["drag", x0, y0, x1, y1]]
 
+    def _scroll(self, box: reader.Box, clicks: int) -> list:
+        """Turn the mouse wheel over a box (negative = scroll down)."""
+        x, y = self.screen_point(box)
+        if not self.dry_run:
+            import pyautogui
+            self._focus()
+            pyautogui.moveTo(x, y, duration=0.15)
+            pyautogui.scroll(clicks)
+            time.sleep(0.3)
+        return [["scroll", x, y, clicks]]
+
     # -- the common shape of every action --
     def _act(self, name: str, precheck, do, check) -> Result:
         before = self.look()
@@ -428,6 +439,60 @@ class Hands:
             out.update(reader.read_battle(np.asarray(window.canonical_picture(img))))
         except Exception as e:     # a reading bug must not stop the run; the capture is kept
             out["problems"] = [f"battle screen not read: {type(e).__name__}: {e}"]
+        return out
+
+    def read_battle_stats(self) -> dict:
+        """On the result box: open Stats, read both teams' numbers, close it again.
+
+        Best effort: reading problems come back in "problems" and the run goes on. Only a
+        window that will not close is reported in "stuck" (the caller must stop then).
+        Both captures are kept in captures/battles/.
+        """
+        import numpy as np
+        out: dict = {"problems": [], "stuck": False}
+        if self.dry_run:
+            return out
+        before = self.look()
+        if before.get("screen") != "result":
+            out["problems"].append(f"stats: not on the result screen ({before.get('screen')})")
+            return out
+        folder = CAPTURE_DIR / "battles"
+        folder.mkdir(parents=True, exist_ok=True)
+        stamp = f"{datetime.now():%Y%m%d_%H%M%S}"
+        pic = np.asarray(window.canonical_picture(self.last_image))
+        try:
+            out["end_hp_fraction"] = reader.read_result_hp(pic)
+        except Exception as e:
+            out["problems"].append(f"end HP not read: {type(e).__name__}: {e}")
+        self._click(reader.RESULT_STATS)
+        state = self.wait_for({"stats"}, 10)
+        if state.get("screen") != "stats":
+            out["problems"].append(f"stats: window did not open ({state.get('screen')})")
+            return out
+        top = self.last_image
+        top.save(folder / f"{stamp}_stats_top.png")
+        scrolled = None
+        try:
+            self._scroll(reader.STATS_SCROLL_POINT, -15)
+            time.sleep(0.5)
+            self.look(save_if_unreadable=False)
+            if reader.detect_screen(np.asarray(window.canonical_picture(self.last_image))) == "stats":
+                scrolled = self.last_image
+                scrolled.save(folder / f"{stamp}_stats_bottom.png")
+        except Exception as e:
+            out["problems"].append(f"stats: scrolling failed: {type(e).__name__}: {e}")
+        try:
+            canon = lambda im: np.asarray(window.canonical_picture(im))
+            out.update(reader.read_stats(canon(top), canon(scrolled) if scrolled is not None else None))
+        except Exception as e:
+            out["problems"].append(f"stats not read: {type(e).__name__}: {e}")
+        out["captures"] = [f"captures/battles/{stamp}_stats_top.png"] + (
+            [f"captures/battles/{stamp}_stats_bottom.png"] if scrolled is not None else [])
+        self._click(reader.STATS_CLOSE)
+        after = self.wait_for({"result"}, 10)
+        if after.get("screen") != "result":
+            out["stuck"] = True
+            out["problems"].append(f"stats: window did not close ({after.get('screen')})")
         return out
 
     def confirm_result(self) -> Result:

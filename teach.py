@@ -150,6 +150,17 @@ LESSONS = [
         "file": "captures/shop_chef_day9.png",
         "text": {"day": "DAY9", "hp": "11600"},
     },
+    {   # Stats window, day 2: lines per card, as (header, slot): [text of each line]
+        "file": "captures/stats_day2.png",
+        "stats": {
+            (0, 0): ["Dealt 150 damage", "Triggered 3 time(s)"],
+            (0, 1): ["Dealt 25 damage", "Inflicted 20 Poison", "Triggered 5 time(s)"],
+            (0, 2): ["Healed 120 HP", "Triggered 6 time(s)"],
+            (0, 4): ["Dealt 75 damage", "Healed 90 HP", "Triggered 3 time(s)"],
+            (0, 5): ["Dealt 75 damage", "Triggered 3 time(s)"],
+            (1, 0): ["Dealt 1 damage", "Triggered 1 time(s)"],
+        },
+    },
     {   # Chef day 10 (first "0" in the title font)
         "file": "captures/shop_chef_day10.png",
         "text": {"day": "DAY10"},
@@ -162,6 +173,24 @@ def _teach_digits(store: glyphs.GlyphStore, font: str, bitmaps: list[np.ndarray]
         raise ValueError(f"{where}: expected {len(digits)} digits, image has {len(bitmaps)}")
     for ch, bm in zip(digits, bitmaps):
         store.add(font, ch, bm)
+
+
+def teach_stats(store: glyphs.GlyphStore, pic: np.ndarray, lesson: dict) -> None:
+    """Stats window glyphs: digits of the number words, letters of the others."""
+    for (h, slot), lines in lesson.get("stats", {}).items():
+        bands = reader._stats_bands(reader.stats_card_images(pic)[(h, slot)])
+        if len(bands) != len(lines):
+            raise ValueError(f"stats ({h},{slot}): {len(lines)} lines expected, image has {len(bands)}")
+        for (kind, words), text in zip(bands, lines):
+            texts = text.split(" ")
+            if len(texts) != len(words):
+                raise ValueError(f"stats ({h},{slot}): '{text}' does not split into {len(words)} words")
+            for w, (word, gl) in enumerate(zip(texts, words)):
+                if len(word) != len(gl):
+                    raise ValueError(f"stats ({h},{slot}): '{word}' has {len(gl)} glyphs")
+                font = "statsdigit" if w == 1 else "statsword"
+                for ch, g in zip(word, gl):
+                    store.add(font, ch, g.bitmap)
 
 
 def main() -> None:
@@ -183,6 +212,7 @@ def main() -> None:
                 store.teach(font, right, price)
             else:
                 store.teach(font, mask, truth)
+        teach_stats(store, pic, lesson)
         for i, name in enumerate(lesson.get("trainer_cards", [])):
             store.teach("caps", glyphs.white(reader.crop(pic, reader._trainer_card_name(i))), name)
         for i, digits in lesson.get("shop_badges", {}).items():

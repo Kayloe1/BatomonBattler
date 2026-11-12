@@ -84,13 +84,36 @@ def act(h, a):
     raise ValueError(f"unknown action {a}")
 
 
-def main() -> int:
+LAST_LOG = None          # path of the log of the latest main() call (batch.py reads it)
+
+
+def alert(why: str, log_path) -> None:
+    """Stop-and-tell: a loud message, a beep and a note file, so a stop is never missed."""
+    text = (f"\n{'=' * 70}\nTHE BOT STOPPED AND NEEDS YOU\n{why}\n"
+            f"Nothing was clicked after this. Look at the game window, then tell Claude what it shows\n"
+            f"(the capture named above is in captures\\). Log: {log_path}\n{'=' * 70}\n")
+    print(text)
+    try:
+        hands_mod.LOG_DIR.mkdir(exist_ok=True)
+        (hands_mod.LOG_DIR / "last_stop.txt").write_text(f"{datetime.now():%Y-%m-%d %H:%M:%S}\n{why}\n", encoding="utf-8")
+    except OSError:
+        pass
+    try:
+        import winsound
+        for _ in range(3):
+            winsound.Beep(1000, 300)
+    except Exception:                      # not Windows, or no sound: the message is enough
+        pass
+
+
+def main(argv=None) -> int:
+    global LAST_LOG
     ap = argparse.ArgumentParser()
     ap.add_argument("--days", type=int, default=99, help="stop after this many battles")
     ap.add_argument("--simple", action="store_true", help="use the old simple shop rules")
     ap.add_argument("--new-run", action="store_true",
                     help="if no run is open, start a CASUAL Pantra run (never Ranked) and pick a trainer")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     h = hands_mod.Hands(dry_run=False)
     brain = None
@@ -100,6 +123,7 @@ def main() -> int:
             return 1
         brain = Brain()
     log_path = hands_mod.LOG_DIR / f"run_{datetime.now():%Y%m%d_%H%M%S}.jsonl"
+    LAST_LOG = log_path
 
     def log(kind: str, **data) -> None:
         with open(log_path, "a", encoding="utf-8") as f:
@@ -108,6 +132,7 @@ def main() -> int:
     def stop(why: str, state: dict | None = None) -> int:
         print("STOPPED:", why)
         log("stop", why=why, state=state)
+        alert(why, log_path)
         return 1
 
     battles = 0
@@ -177,6 +202,16 @@ def main() -> int:
             print(f"day {state['day']}: battle -> {r.message}")
             log("battle", team=state["team"], ok=r.ok, message=r.message, day=state["day"],
                 trainer=state["trainer"], trainer_hp=state["trainer_hp"], seen=r.battle)
+            if r.ok and r.battle is not None:
+                # the numbers of the battle that was just fought; never stops the run, except a
+                # Stats window that will not close
+                st = h.read_battle_stats()
+                r.battle["stats"] = {k: v for k, v in st.items() if k != "stuck"}
+                log("battle_stats", day=state["day"], **r.battle["stats"])
+                for p_ in st["problems"]:
+                    print("  stats:", p_)
+                if st["stuck"]:
+                    return stop("the Stats window did not close", None)
             if not r.ok:
                 return stop(f"battle did not reach the result box: {r.message} "
                             f"(capture: {(r.after or {}).get('saved_capture')})", r.after)
