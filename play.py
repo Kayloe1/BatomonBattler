@@ -55,6 +55,33 @@ def choose_purchase(state: dict) -> int | None:
     return -neg_i
 
 
+def _roster(state: dict | None) -> list[str]:
+    """Every owned monster as "name Lv n [badges]", for comparing two shop states."""
+    out = []
+    for s in ((state or {}).get("team") or []) + ((state or {}).get("bench") or []):
+        if s:
+            badges = ",".join(f"{b.get('stat')} {b.get('value')}" for b in s.get("stats", []))
+            out.append(f"{s.get('name') or 'unnamed'} Lv{s.get('level')} [{badges}]")
+    return out
+
+
+def event_outcome(before: dict | None, after: dict) -> dict:
+    """What changed between the shop before an event and the shop after it.
+
+    The next day's income is inside the money change, so compare it with days without an event.
+    """
+    a, b = _roster(before), _roster(after)
+    gained, lost = list(b), []
+    for m in a:
+        if m in gained:
+            gained.remove(m)
+        else:
+            lost.append(m)
+    return {"day": after.get("day"), "money_before": (before or {}).get("money"), "money_after": after.get("money"),
+            "lives_before": (before or {}).get("lives"), "lives_after": after.get("lives"),
+            "monsters_new_or_changed": gained, "monsters_gone_or_changed": lost}
+
+
 def learn_sprites(h, state: dict) -> None:
     """Save the shop cards' sprites so opponents' monsters can be named on the battle screen."""
     if getattr(h, "last_image", None) is None:
@@ -153,6 +180,7 @@ def main(argv=None) -> int:
         return 1
 
     battles = 0
+    pending_event: dict | None = None
     last_shop_state: dict | None = None
     played = False          # True once this session has acted inside a run
     last_shop: dict | None = None
@@ -174,6 +202,10 @@ def main(argv=None) -> int:
                 print(f"day {last_shop['day']}: badges {outcome['badges']:+d}, lives {outcome['lives']:+d}")
                 last_shop = None
             log("shop", state=state)
+            if pending_event is not None:
+                # what the event actually did: the first shop after it, next to the last shop before it
+                log("event_outcome", **pending_event, **event_outcome(pending_event.pop("_before"), state))
+                pending_event = None
             learn_sprites(h, state)
             if brain is None:
                 i = choose_purchase(state)
@@ -233,6 +265,12 @@ def main(argv=None) -> int:
             if not r.ok:
                 return stop(f"battle did not reach the result box: {r.message} "
                             f"(capture: {(r.after or {}).get('saved_capture')})", r.after)
+        elif screen == "main_menu_continue":
+            r = h.continue_run()
+            print(f"main menu: a run is open, pressed Continue -> {r.message}")
+            log("continue_run", ok=r.ok, message=r.message)
+            if not r.ok:
+                return stop(f"after Continue: {r.message} (capture: {(r.after or {}).get('saved_capture')})", r.after)
         elif screen == "title":
             r = h.leave_title()
             log("title", ok=r.ok, message=r.message)
@@ -309,6 +347,8 @@ def main(argv=None) -> int:
             think(lines + [f"({r.message})"])
             log("event", choice=k, choices=state["choices"], effects=effects, raw=state.get("raw"), why=lines,
                 ok=r.ok, message=r.message)
+            pending_event = {"effects": effects, "picked": effects[k] if k < len(effects) else None,
+                             "_before": last_shop_state}
             if not r.ok:
                 return stop(f"after the event: {r.message} (capture: {(r.after or {}).get('saved_capture')})", r.after)
         else:

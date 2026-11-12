@@ -135,6 +135,43 @@ def income(records: list[dict]) -> list[dict]:
     return rows
 
 
+def events_seen(records: list[dict]) -> dict:
+    """Every event met: its choices, how often each was picked, what followed, and what is still unknown."""
+    try:
+        import reader
+        known = set(reader.KNOWN_EVENT_EFFECTS)
+    except Exception:
+        known = set()
+    events: dict[tuple, dict] = {}
+    unread, new_lines, guessed = Counter(), Counter(), Counter()
+    for r in records:
+        if r.get("kind") == "event":
+            effects = r.get("effects") or []
+            key = tuple(e or "(unreadable)" for e in effects)
+            e = events.setdefault(key, {"choices": list(key), "seen": 0, "picked": Counter(), "outcomes": []})
+            e["seen"] += 1
+            k = r.get("choice")
+            if isinstance(k, int) and k < len(key):
+                e["picked"][key[k]] += 1
+            for eff, raw in zip(effects, r.get("raw") or [None] * len(effects)):
+                if eff is None:
+                    unread[raw or "?"] += 1
+                elif known and eff not in known:
+                    new_lines[eff] += 1
+            for line in r.get("why") or []:
+                if "[guess]" in line:
+                    guessed[line.strip().split("  ", 1)[-1].split(":")[0]] += 1
+        elif r.get("kind") == "event_outcome":
+            key = tuple(e or "(unreadable)" for e in (r.get("effects") or []))
+            if key in events:
+                events[key]["outcomes"].append({k: r.get(k) for k in (
+                    "picked", "day", "money_before", "money_after", "lives_before", "lives_after",
+                    "monsters_new_or_changed", "monsters_gone_or_changed")})
+    return {"events": [{**e, "picked": dict(e["picked"])} for e in events.values()],
+            "unreadable_lines": dict(unread), "new_effect_lines": dict(new_lines),
+            "scored_by_guess": dict(guessed)}
+
+
 def report(paths: list[Path]) -> dict:
     runs, allrecs = [], []
     for p in paths:
@@ -157,7 +194,7 @@ def report(paths: list[Path]) -> dict:
             "seen_counts": {k: dict(v) for k, v in seen.items()},
             "unnamed_opponent_monsters": unnamed_opponents(allrecs),
             "shop_offers": {k: {"odds": v["odds"], "cards": dict(v["cards"])} for k, v in shop_offers(allrecs).items()},
-            "income": income(allrecs)}
+            "income": income(allrecs), "events": events_seen(allrecs)}
 
 
 def show(rep: dict) -> None:
@@ -181,6 +218,23 @@ def show(rep: dict) -> None:
         obs = " / ".join(f"{100 * e['cards'].get(r, 0) / total:.0f}" for r in RARITIES)
         odds = " / ".join(str((e["odds"] or {}).get(r, "?")) for r in RARITIES)
         print(f"  rank {rank}: printed {odds} | offered {obs} (n={total})")
+    ev = rep.get("events") or {}
+    if ev.get("events"):
+        print(f"\nEvents met ({len(ev['events'])} different):")
+        for e in ev["events"]:
+            print(f"  seen {e['seen']}x: " + " | ".join(e["choices"]))
+            for name, n in e["picked"].items():
+                print(f"      picked {n}x: {name}")
+            for o in e["outcomes"][-2:]:
+                print(f"      after '{o['picked']}': money {o['money_before']} -> {o['money_after']}, "
+                      f"lives {o['lives_before']} -> {o['lives_after']}, new/changed: "
+                      f"{', '.join(o['monsters_new_or_changed']) or 'nothing'}")
+        if ev["scored_by_guess"]:
+            print("  Effects still scored by a guess (need a real description): " + "; ".join(ev["scored_by_guess"]))
+        if ev["new_effect_lines"]:
+            print("  New effect lines not in the known list yet: " + "; ".join(ev["new_effect_lines"]))
+        if ev["unreadable_lines"]:
+            print("  Lines the reader could not read (raw): " + "; ".join(ev["unreadable_lines"]))
     if rep["income"]:
         print("\nMoney: left over after shopping day D -> start of day D+1")
         by_day = defaultdict(list)
