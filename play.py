@@ -88,6 +88,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--days", type=int, default=99, help="stop after this many battles")
     ap.add_argument("--simple", action="store_true", help="use the old simple shop rules")
+    ap.add_argument("--learned", action="store_true",
+                    help="shop with the policy learned by practice runs (train/) instead of the planner")
     ap.add_argument("--new-run", action="store_true",
                     help="if no run is open, start a CASUAL Pantra run (never Ranked) and pick a trainer")
     args = ap.parse_args()
@@ -98,7 +100,7 @@ def main() -> int:
         if Brain is None:
             print("decision engine unavailable:", _ENGINE_ERROR)
             return 1
-        brain = Brain()
+        brain = Brain(learned=args.learned)
     log_path = hands_mod.LOG_DIR / f"run_{datetime.now():%Y%m%d_%H%M%S}.jsonl"
 
     def log(kind: str, **data) -> None:
