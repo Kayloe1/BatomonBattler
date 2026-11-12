@@ -215,8 +215,15 @@ def main(argv=None) -> int:
             if not r.ok:
                 return stop(f"battle did not reach the result box: {r.message} "
                             f"(capture: {(r.after or {}).get('saved_capture')})", r.after)
-        elif screen in ("run_over", "new_run"):
-            if screen == "run_over" and played:
+        elif screen == "cash_in":
+            h.last_image.save(hands_mod.CAPTURE_DIR / f"cash_in_{datetime.now():%Y%m%d_%H%M%S}.png")
+            r = h.cash_in()
+            print(f"cash in -> {r.message}")
+            log("cash_in", ok=r.ok, message=r.message)
+            if not r.ok:
+                return stop(f"after Cash In: {r.message} (capture: {(r.after or {}).get('saved_capture')})", r.after)
+        elif screen in ("run_over", "new_run", "main_menu"):
+            if screen in ("run_over", "main_menu") and played:
                 h.last_image.save(hands_mod.CAPTURE_DIR / f"run_over_{datetime.now():%Y%m%d_%H%M%S}.png")
                 print("run over")
                 log("run_over")

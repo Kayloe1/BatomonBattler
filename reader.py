@@ -112,6 +112,12 @@ SCREENS: dict[str, list[tuple[int, int, tuple[int, int, int]]]] = {
                      (100, 1215, (14, 14, 14))],
     # "This journey ends here.": camera (left), New Run and Main Menu (right)
     "run_over": [(60, 1310, (255, 206, 0)), (1300, 1300, RED), (1900, 1300, RED), (1280, 60, (14, 14, 14))],
+    # Main menu: New Run / Batopedia / Settings buttons (red) and the blue Patch Notes / Mobile buttons
+    "main_menu": [(1276, 740, RED), (1276, 893, RED), (1276, 1200, RED), (25, 1118, (21, 157, 216)),
+                  (25, 1238, (21, 157, 216))],
+    # "Cash In": a trinket dialog (blue header, white body) with one red button, shop dimmed behind it
+    "cash_in": [(1280, 255, (0, 132, 189)), (1280, 560, (255, 255, 255)), (1152, 1020, RED),
+                (1408, 1046, RED), (25, 1315, (22, 22, 23))],
     # Battle: the two trainer portraits in the bottom corners (their frames do not move)
     "battle": [(30, 1160, (156, 156, 173)), (2530, 1160, (156, 156, 173)), (30, 1420, (255, 255, 255)),
                (2530, 1420, (255, 255, 255))],
@@ -125,6 +131,8 @@ def fast_forward_on(pic: np.ndarray) -> bool:
 
 # Buttons on the other screens
 RESULT_CONFIRM: Box = BATTLE_BUTTON
+MAIN_MENU_NEW_RUN: Box = (845, 716, 1715, 842)
+CASH_IN_BUTTON: Box = (1088, 989, 1472, 1104)
 RESULT_STATS: Box = (19, 330, 448, 451)
 STATS_CLOSE: Box = (2240, 125, 2310, 200)
 EVENT_CHOICE_COLUMN = 1500              # x that crosses every choice box
@@ -1081,7 +1089,7 @@ def read_state(image: Image.Image) -> dict:
     state: dict = {"screen": detect_screen(pic)}
     if state["screen"] == "shop":
         state.update(read_shop(pic))
-    elif state["screen"] in ("result", "stats", "matchmaking", "blank", "battle", "run_over"):
+    elif state["screen"] in ("result", "stats", "matchmaking", "blank", "battle", "run_over", "main_menu", "cash_in"):
         # recognised. The battle field is read with read_battle() only on request: it takes
         # a few seconds, too slow for every frame while waiting.
         state["problems"] = []            # recognised; nothing on them is read yet
