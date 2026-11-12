@@ -161,6 +161,17 @@ EVENT_PICKS = [
     ("meteor", "level up a level 1 monster", "only if it is a carry piece, else the cash"),
     ("mysterious trainer", "a life and a trinket", "rescue at 0 lives; the random monster never fit the team"),
 ]
+# The same lessons keyed by words of a choice's effect line (what the reader can read):
+# (words in the effect line, +1 prefer / -1 never, why)
+EVENT_EFFECT_NOTES = [
+    ("Randomly transform your monsters", -1, "the Recombobulator replaces the team at random and wipes permanent growth"),
+    ("Gain Dragon Egg", +1, "it hatches a random Legendary Dragon later; it waits on the bench"),
+    ("Gain Gold-o-matic", +1, "extra income every day"),
+    ("Turn a monster SHINY", +1, "a shiny carry was the strongest single upgrade"),
+    ("Level up a monster", +1, "levelling the carry beat the cash option"),
+    ("foreign Rare monster", +1, "a free Rare, and it can then appear in the shop"),
+    ("trinket gift", +1, "a trinket keeps working for the rest of the run"),
+]
 NEVER_PICK = {"Recombobulator": "randomly transforms your monsters and destroys permanent growth"}
 
 

@@ -29,6 +29,16 @@ class NewScreens(unittest.TestCase):
             red = reader._near(pic[y0:y1, x0:x1], (239, 66, 107), 40).mean()
             self.assertGreater(red, 0.5, name)      # the box sits on the red button (text aside)
 
+    def test_event_effect_lines_are_read(self):
+        self.assertEqual(state("event_dragon_hoard.png")["effects"],
+                         ["Gain Dragon Egg", "Gain Hero's Sword", "Gain $20"])
+        self.assertEqual(state("event_20261112_132759.png")["effects"],
+                         ["Gain a foreign Rare monster. It can now appear in your shop.", "Gain Kaleidoscope",
+                          "Gain Fake Diamond"])
+        self.assertEqual(state("event_20261112_090216.png")["effects"][1],
+                         "Give a monster Electric typing and +5 Shock")
+        self.assertEqual(state("event_20261112_133833.png")["choices"], 3)
+
     def test_other_screens_not_mistaken(self):
         for name in ("stats_day2.png", "result_loss_day3.png"):
             self.assertNotIn(state(name)["screen"], ("main_menu", "cash_in"))
