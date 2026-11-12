@@ -15,7 +15,8 @@ It reads the screen and plays a run that is already open with simple rules; see 
 | `teach.py` | Rebuilds `templates/` (glyphs and monster sprites) from labelled captures |
 | `hands.py` | Mouse actions (buy, move, sell, reroll, lock, battle, confirm, event choice), each one checked afterwards |
 | `play.py` | Plays the open run with simple rules and logs everything; stops on anything unclear |
-| `tests/` | Tests that run on the saved captures |
+| `sim/` | Offline battle simulator (`python -m sim --help`, `docs/simulator.md`) |
+| `tests/` | Tests that run on the saved captures, plus `test_sim.py` for the simulator |
 | `captures/` | Saved screenshots; a `.expected.json` beside one makes it a test |
 | `templates/` | Glyph and sprite templates (built by `teach.py`) |
 | `logs/` | One JSON line per action |
