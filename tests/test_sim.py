@@ -216,6 +216,22 @@ class Robustness(unittest.TestCase):
             r = simulate(rand_team(), rand_team(), seed=i)
             self.assertIn(r.winner, ("a", "b", "draw"))
 
+    def test_self_accelerating_team_finishes(self):
+        # Galvanine Lv4 gains +50% Cooldown Speed per cast; without the min_cooldown floor this
+        # battle never ended.
+        a = team([None, mon("Pebbler", 4), mon("Guardiant"), mon("Geminiss", 4), mon("Aegistruct"),
+                  mon("Craghorn", 2)], hp=800, trinkets=["Razor Beak", "Warhorn", "Repeater Charm"])
+        b = team([mon("Noxalith", 2), mon("Galvanine", 4), mon("Noxnimbus", 3), mon("Dirgefin", 4),
+                  None, mon("Dryadell", 4)], hp=8300, trinkets=["Razor Beak", "Metronome", "Repeater Charm"])
+        r = simulate(a, b)
+        self.assertIn(r.winner, ("a", "b", "draw"))
+
+    def test_speed_cache_follows_buffs(self):
+        # Boomagon speeds up the ally behind it on each cast; the cached speed must follow.
+        r = simulate(team([mon("Panbud"), mon("Boomagon", 4)]), EMPTY, until=60)
+        r0 = simulate(team([mon("Panbud")]), EMPTY, until=60)
+        self.assertGreater(r.units[0][0]["triggered"], r0.units[0][0]["triggered"])
+
     def test_same_seed_same_result(self):
         a = team([mon("Reapra", 4), mon("Panbud")], trinkets=["Tempo Charm"])
         b = team([mon("Velocect"), mon("Panbud"), mon("Spinarai")], trinkets=["Tempo Charm"])

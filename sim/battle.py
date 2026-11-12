@@ -210,6 +210,8 @@ class Battle:
         self.next_poison = SETTINGS["poison_interval"]
         self.next_burn = SETTINGS["burn_interval"]
         self.depth = 0
+        self._adj: dict[int, list[Unit]] = {}
+        self._speeds: dict[int, float] | None = None   # cached speed_of; None = recompute
 
     # ---------- setup ----------
     def _trainer(self, side: int, team: dict) -> Trainer:
@@ -260,10 +262,31 @@ class Battle:
         return self.unit_at(u.side, u.row - 1, u.col) if u.row == 1 else None
 
     def adjacent(self, u: Unit) -> list[Unit]:
+        # Positions never change during a battle, so the neighbour list is computed once.
+        cached = self._adj.get(id(u))
+        if cached is not None:
+            return cached
         if self.trainers[u.side].link_cable:
-            return [v for v in self.teams[u.side] if v and v is not u]
-        cells = [(u.row, u.col - 1), (u.row, u.col + 1), (u.row - 1, u.col), (u.row + 1, u.col)]
-        return [v for v in (self.unit_at(u.side, r, c) for r, c in cells) if v]
+            out = [v for v in self.teams[u.side] if v and v is not u]
+        else:
+            cells = [(u.row, u.col - 1), (u.row, u.col + 1), (u.row - 1, u.col), (u.row + 1, u.col)]
+            out = [v for v in (self.unit_at(u.side, r, c) for r, c in cells) if v]
+        self._adj[id(u)] = out
+        return out
+
+    def speeds_changed(self) -> None:
+        """Call after anything that can change a cooldown speed: a speed buff, a knockout."""
+        self._speeds = None
+
+    def speed(self, u: Unit) -> float:
+        """speed_of(u), cached until speeds_changed() is called, and capped so the effective
+        cooldown never drops below SETTINGS["min_cooldown"]."""
+        if self._speeds is None:
+            self._speeds = {}
+        v = self._speeds.get(id(u))
+        if v is None:
+            v = self._speeds[id(u)] = self.speed_of(u)
+        return min(v, u.cooldown / SETTINGS["min_cooldown"])
 
     def allies(self, u: Unit) -> list[Unit]:
         return [v for v in self.teams[u.side] if v and v is not u]
@@ -367,6 +390,7 @@ class Battle:
             self.say(f"{u.name} (side {u.side}) Protect blocks a Knockout")
             return
         u.alive = False
+        self.speeds_changed()
         self.say(f"{u.name} (side {u.side}) is knocked out")
 
     def charge(self, u: Unit, seconds: float) -> None:
@@ -451,6 +475,7 @@ class Battle:
             b = self.behind(u)
             if b:
                 b.speed += p
+                self.speeds_changed()
         elif name == "Noxnimbus":
             for v in self.adjacent(u):
                 if "Toxic" in v.types:
@@ -520,6 +545,7 @@ class Battle:
             u.cooldown += p
         elif name == "Galvanine":
             u.speed += 50
+            self.speeds_changed()
             u.stats["shock"] += p
         elif name == "Geminiss":
             for v in self.adjacent(u):
@@ -557,6 +583,7 @@ class Battle:
         elif name == "Scorchimp" and u.evolved():
             fire = sum(1 for v in self.allies(u) if "Fire" in v.types)
             u.speed += p * fire
+            self.speeds_changed()
 
     def trinket_start(self, side: int) -> None:
         tr = self.trainers[side]
@@ -620,6 +647,7 @@ class Battle:
 
     def run(self) -> BattleResult:
         self.start()
+        self.speeds_changed()
         limit = SETTINGS["time_limit"] if self.until is None else self.until
         result = None
         if not self.immortal and any(self.dead()):
@@ -629,7 +657,7 @@ class Battle:
             times = [self.next_poison, self.next_burn]
             for side in (0, 1):
                 for u in self.living(side):
-                    times.append(self.t + max(0.0, u.cooldown - u.progress) / self.speed_of(u))
+                    times.append(self.t + max(0.0, u.cooldown - u.progress) / self.speed(u))
                     if u.is_("Shelldra") and u.active_passive():
                         times.append(u.shelldra_next)
             t_next = min(times)
@@ -639,7 +667,7 @@ class Battle:
             dt = t_next - self.t
             for side in (0, 1):
                 for u in self.living(side):
-                    u.progress += dt * self.speed_of(u)
+                    u.progress += dt * self.speed(u)
             self.t = t_next
             # Casts: keep going while someone is ready (charges can make more units ready).
             for _ in range(50):
