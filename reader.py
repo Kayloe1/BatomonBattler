@@ -115,6 +115,9 @@ SCREENS: dict[str, list[tuple[int, int, tuple[int, int, int]]]] = {
     # Main menu: New Run / Batopedia / Settings buttons (red) and the blue Patch Notes / Mobile buttons
     "main_menu": [(1276, 740, RED), (1276, 893, RED), (1276, 1200, RED), (25, 1118, (21, 157, 216)),
                   (25, 1238, (21, 157, 216))],
+    # Title screen: the logo, the dragon silhouette and the dark "PRESS ANY KEY TO START" label
+    "title": [(768, 240, (237, 103, 250)), (1408, 240, (67, 249, 245)), (1280, 739, (111, 49, 71)),
+              (890, 1045, (55, 55, 55)), (1650, 1045, (55, 55, 55))],
     # "Cash In": a trinket dialog (blue header, white body) with one red button, shop dimmed behind it
     "cash_in": [(1280, 255, (0, 132, 189)), (1280, 560, (255, 255, 255)), (1152, 1020, RED),
                 (1408, 1046, RED), (25, 1315, (22, 22, 23))],
@@ -131,6 +134,7 @@ def fast_forward_on(pic: np.ndarray) -> bool:
 
 # Buttons on the other screens
 RESULT_CONFIRM: Box = BATTLE_BUTTON
+TITLE_ANYWHERE: Box = (1180, 1300, 1380, 1400)     # empty sky under the label
 MAIN_MENU_NEW_RUN: Box = (845, 716, 1715, 842)
 CASH_IN_BUTTON: Box = (1088, 989, 1472, 1104)
 RESULT_STATS: Box = (19, 330, 448, 451)
@@ -1129,7 +1133,7 @@ def read_state(image: Image.Image) -> dict:
     state: dict = {"screen": detect_screen(pic)}
     if state["screen"] == "shop":
         state.update(read_shop(pic))
-    elif state["screen"] in ("result", "stats", "matchmaking", "blank", "battle", "run_over", "main_menu", "cash_in"):
+    elif state["screen"] in ("result", "stats", "matchmaking", "blank", "battle", "run_over", "main_menu", "cash_in", "title"):
         # recognised. The battle field is read with read_battle() only on request: it takes
         # a few seconds, too slow for every frame while waiting.
         state["problems"] = []            # recognised; nothing on them is read yet

@@ -500,6 +500,10 @@ class Hands:
         return self._press_and_wait("confirm result", "result", reader.RESULT_CONFIRM,
                                     {"shop", "event", "run_over", "gift_box", "trinket_pick", "cash_in"}, 40)
 
+    def leave_title(self) -> Result:
+        """Click on the title screen ("press any key to start"); the main menu follows."""
+        return self._press_and_wait("leave title", "title", reader.TITLE_ANYWHERE, {"main_menu", "shop", "new_run"}, 20)
+
     def cash_in(self) -> Result:
         """Press "Cash In" on a trinket dialog (e.g. Fake Diamond after a loss: gain money)."""
         return self._press_and_wait("cash in", "cash_in", reader.CASH_IN_BUTTON,

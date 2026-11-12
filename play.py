@@ -233,6 +233,11 @@ def main(argv=None) -> int:
             if not r.ok:
                 return stop(f"battle did not reach the result box: {r.message} "
                             f"(capture: {(r.after or {}).get('saved_capture')})", r.after)
+        elif screen == "title":
+            r = h.leave_title()
+            log("title", ok=r.ok, message=r.message)
+            if not r.ok:
+                return stop(f"after the title screen: {r.message} (capture: {(r.after or {}).get('saved_capture')})", r.after)
         elif screen == "cash_in":
             h.last_image.save(hands_mod.CAPTURE_DIR / f"cash_in_{datetime.now():%Y%m%d_%H%M%S}.png")
             r = h.cash_in()

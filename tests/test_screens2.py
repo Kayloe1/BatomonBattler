@@ -19,6 +19,10 @@ class NewScreens(unittest.TestCase):
     def test_main_menu(self):
         self.assertEqual(state("main_menu.png")["screen"], "main_menu")
 
+    def test_title(self):
+        self.assertEqual(state("title_screen.png")["screen"], "title")
+        self.assertEqual(state("title_screen.png")["problems"], [])
+
     def test_cash_in(self):
         self.assertEqual(state("cash_in_fake_diamond.png")["screen"], "cash_in")
 
