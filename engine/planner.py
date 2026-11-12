@@ -80,6 +80,10 @@ class Plan:
     actions: list[Action]
     value: float
     notes: list[str] = field(default_factory=list)
+    # for explaining the choice (engine/explain.py): every option weighed as (label, gain over
+    # ending the turn now), best first, and the chance to win today's battle with the team as it is
+    considered: list[tuple[str, float]] = field(default_factory=list)
+    win_now: float | None = None
 
 
 def stake_weight(s: RunState) -> float:
@@ -299,28 +303,35 @@ class Planner:
         base = self.quick(s, team, bench)
         base_finish = self.finish(s, team, bench, base)
         best_label, best_actions, best_v = "end turn", [], base
+        considered = []
+        win_now = self.win_today(s, team) if any(team) else 0.0
         for label, actions, t in self._candidates(s):
             v, team2, bench2 = self.evaluate_after(s, t, team, bench)
             v = self.finish(t, team2, bench2, v)
+            considered.append((label, v - base))
             if v > best_v + self.p.min_gain:
                 best_label, best_actions, best_v = label, actions, v
         rv = self._reroll_value(s, team, bench)
         if rv is not None:
             notes.append(f"reroll {rv - base:+.3f} vs best {best_v - base:+.3f}")
+            considered.append(("reroll", rv - base))
             if rv > max(best_v, base_finish) + self.p.min_gain:
                 best_label, best_actions, best_v = "reroll", [Action("reroll")], rv
         if best_actions:
             for a in best_actions:
                 a.why, a.value = best_label, best_v
-            return Plan(best_actions, best_v, notes + [f"{best_label}: {best_v - base:+.3f}"])
+            return Plan(best_actions, best_v, notes + [f"{best_label}: {best_v - base:+.3f}"],
+                        considered=considered, win_now=win_now)
         # nothing beats ending the turn: tickets, lock, then arrange and battle
         for i, c in enumerate(s.shop):
             if c and c.kind == "item" and c.name in TICKETS and c.price <= s.money and s.items_left > 0:
-                return Plan([Action("item", i, why=f"use {c.name} (shop of one rarity)")], base, notes)
+                return Plan([Action("item", i, why=f"use {c.name} (shop of one rarity)")], base, notes,
+                            considered=considered, win_now=win_now)
         if s.items_left > 0 and s.owned():
             for i, c in enumerate(s.shop):
                 if c and c.kind == "item" and c.name in FREE_BUFFS and c.price == 0:
-                    return Plan([Action("item", i, why=f"use free {c.name}")], base, notes)
+                    return Plan([Action("item", i, why=f"use free {c.name}")], base, notes,
+                                considered=considered, win_now=win_now)
         actions: list[Action] = []
         lock = self._lock_choice(s, team, bench, base)
         if lock:
@@ -329,7 +340,7 @@ class Planner:
         win = self.win_today(s, team)
         notes.append(f"expected win chance today {win:.0%}")
         actions.append(Action("battle", why=f"expected win chance {win:.0%}"))
-        return Plan(actions, base, notes)
+        return Plan(actions, base, notes, considered=considered, win_now=win)
 
     def _lock_choice(self, s: RunState, team, bench, base: float) -> str | None:
         if s.locked:

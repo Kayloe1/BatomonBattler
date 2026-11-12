@@ -29,6 +29,7 @@ from datetime import datetime
 import hands as hands_mod
 
 try:
+    from engine.explain import explain
     from engine.bot import Brain
 except ImportError as e:                 # engine needs the simulator (sim/)
     Brain = None
@@ -129,6 +130,22 @@ def main(argv=None) -> int:
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(json.dumps({"time": datetime.now().isoformat(timespec="seconds"), "kind": kind, **data}) + "\n")
 
+    think_path = log_path.with_name(log_path.name.replace("run_", "thinking_").replace(".jsonl", ".txt"))
+
+    def think(lines: list[str]) -> None:
+        """Say what the bot is thinking: on screen and in logs\\thinking_<time>.txt."""
+        print("\n".join(lines))
+        try:
+            with open(think_path, "a", encoding="utf-8") as f:
+                f.write("\n".join(lines) + "\n\n")
+        except OSError:
+            pass
+
+    if brain is not None:
+        think(["HOW TO READ THIS: each option gets a 'gain' = how much better the run looks after it",
+               "(and the buys it leads to) than ending the turn now. It mixes the chance to win today,",
+               "the next two days, money kept and progress to level-ups. Bigger is better."])
+
     def stop(why: str, state: dict | None = None) -> int:
         print("STOPPED:", why)
         log("stop", why=why, state=state)
@@ -173,6 +190,7 @@ def main(argv=None) -> int:
                 last_shop_state = state
                 plan = brain.shop_plan(state)
                 a = plan.actions[0]
+                think(explain(plan, state))
                 log("plan", actions=[str(x) for x in plan.actions], why=[x.why for x in plan.actions],
                     notes=plan.notes, value=plan.value)
                 if a.kind != "battle" and not (a.kind in ("lock", "move")):
@@ -246,7 +264,8 @@ def main(argv=None) -> int:
             offered = state["trinkets"]
             k, why = brain.trinket(last_shop_state, offered) if brain else (0, "first card")
             r = h.pick_trinket(k)
-            print(f"trinkets {offered}: took {offered[k] if k < len(offered) else k} ({why}) -> {r.message}")
+            think([f"Trinket choice between {', '.join(str(o) for o in offered)}: "
+                   f"I took {offered[k] if k < len(offered) else k} because {why}. ({r.message})"])
             log("trinket", offered=offered, picked=k, why=why, ok=r.ok, message=r.message)
             if not r.ok:
                 return stop(f"after picking a trinket: {r.message}", r.after)
@@ -259,7 +278,8 @@ def main(argv=None) -> int:
             else:
                 k = next((offered.index(t) for t in PREFERRED_TRAINERS if t in offered), 0)
                 why = "preferred list"
-            print(f"trainer choice: {why}")
+            think([f"Trainer choice between {', '.join(str(o) for o in offered)}: "
+                   f"{offered[k] or 'card ' + str(k)}. Reason: {why}."])
             r = h.pick_trainer(k)
             print(f"trainers {offered}: picked {offered[k] or 'card ' + str(k)} -> {r.message}")
             log("trainer", offered=offered, picked=k, ok=r.ok, message=r.message)
@@ -277,7 +297,8 @@ def main(argv=None) -> int:
             h.last_image.save(hands_mod.CAPTURE_DIR / f"event_{datetime.now():%Y%m%d_%H%M%S}.png")
             k = state["choices"] - 1
             r = h.choose_event(k)
-            print(f"event: took choice {k} of {state['choices']} -> {r.message}")
+            think([f"Event: I took the last of the {state['choices']} choices. I cannot read event text yet, "
+                   f"so this is a fixed rule, not a judgement. ({r.message})"])
             log("event", choice=k, choices=state["choices"], ok=r.ok, message=r.message)
             if not r.ok:
                 return stop(f"after the event: {r.message} (capture: {(r.after or {}).get('saved_capture')})", r.after)
