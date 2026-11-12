@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+import glyphs
 import reader
 import window
 
@@ -109,6 +110,49 @@ class ShopAfterReroll(unittest.TestCase):
 
     def test_capital_o_is_zero(self):
         self.assertEqual(reader.resolve("0nsetra", reader.MONSTER_NAMES), "Onsetra")
+
+
+class CompletedNumbers(unittest.TestCase):
+    """A number with an unknown digit is completed only when the game data agrees with what was read."""
+
+    def test_fill_number(self):
+        self.assertEqual(reader.fill_number("24?00", 24900), 24900)
+        self.assertIsNone(reader.fill_number("24?00", 34700))      # a read digit disagrees
+        self.assertIsNone(reader.fill_number("24?0", 24900))       # wrong length
+        self.assertIsNone(reader.fill_number("???00", 24900))      # too little was read
+        self.assertIsNone(reader.fill_number("24900", 24900))      # nothing unknown: not this function's job
+
+    def test_day11_shop(self):
+        state = reader.read_state(Image.open(CAP / "shop_day11_hp.png"))
+        self.assertEqual(state["problems"], [])
+        self.assertEqual((state["day"], state["trainer_hp"], state["money"]), (11, 24900, 87))
+        self.assertEqual([(c["name"], c["price"]) for c in state["shop"]],
+                         [("Geminiss", 50), ("Electranade", 25), ("Aristobat", 25), ("Sirenade", 40), ("Voucher", 5)])
+
+    def test_unknown_hp_digit_is_completed_from_the_day(self):
+        old = reader._store
+        try:
+            st = glyphs.GlyphStore()
+            st.fonts["hp"] = [e for e in st.fonts["hp"] if e[0] != "9"]
+            reader._store = st
+            state = reader.read_state(Image.open(CAP / "shop_day11_hp.png"))
+        finally:
+            reader._store = old
+        self.assertEqual(state["problems"], [])
+        self.assertEqual(state["trainer_hp"], 24900)
+        self.assertEqual(len(state["notes"]), 1)
+
+    def test_unknown_price_digit_is_completed_from_the_list_price(self):
+        old = reader._store
+        try:
+            st = glyphs.GlyphStore()
+            st.fonts["card"] = [e for e in st.fonts["card"] if e[0] != "4"]
+            reader._store = st
+            state = reader.read_state(Image.open(CAP / "shop_day11_hp.png"))
+        finally:
+            reader._store = old
+        self.assertEqual(state["problems"], [])
+        self.assertEqual(state["shop"][3]["price"], 40)
 
 
 if __name__ == "__main__":

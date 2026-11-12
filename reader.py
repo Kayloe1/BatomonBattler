@@ -329,6 +329,33 @@ def resolve(text: str, candidates: list[str], ignore_case: bool = False) -> str 
     return None
 
 
+def fill_number(text: str, expected: int | None) -> int | None:
+    """A number read with unknown digits ("24?00"), completed from the value the game data expects.
+
+    Only when the length fits, every digit that was read agrees, and at least half were read.
+    The reader still never invents a value: the expected one must match what is on screen.
+    """
+    if expected is None or glyphs.UNKNOWN not in text:
+        return None
+    e = str(expected)
+    known = sum(ch != glyphs.UNKNOWN for ch in text)
+    if len(e) == len(text) and known * 2 >= len(text) and all(a == b or a == glyphs.UNKNOWN for a, b in zip(text, e)):
+        return expected
+    return None
+
+
+def _list_cost(name: str | None, kind: str | None) -> int | None:
+    try:
+        from engine import data
+        if kind == "monster":
+            return data.roster()[name].cost
+        if kind == "item":
+            return data.items()[name]["cost"]
+    except Exception:
+        pass
+    return None
+
+
 # --------------------------------------------------------------- helpers ----
 
 _store: glyphs.GlyphStore | None = None
@@ -1094,7 +1121,8 @@ def _read_owned_slot(pic: np.ndarray, box: Box, where: str, problems: list[str])
     return {"name": name, "level": level, "stats": badges, "sprite_distance": round(dist, 1) if dist < 1e8 else None}
 
 
-def _read_shop_slot(pic: np.ndarray, i: int, masks: dict, problems: list[str]) -> dict | None:
+def _read_shop_slot(pic: np.ndarray, i: int, masks: dict, problems: list[str],
+                    notes: list[str] | None = None) -> dict | None:
     font, mask, _ = masks[f"shop{i}"]
     text_rgb = crop(pic, _card_text(i))
     if _near(text_rgb, SOLD_GREY, 6).mean() > 0.8:
@@ -1117,6 +1145,10 @@ def _read_shop_slot(pic: np.ndarray, i: int, masks: dict, problems: list[str]) -
         if name:
             kind = "item"
     price = _to_int(raw_price[1:]) if raw_price.startswith("$") else None
+    if price is None and raw_price.startswith("$"):
+        price = fill_number(raw_price[1:], _list_cost(name, kind))
+        if price is not None and notes is not None:
+            notes.append(f"shop {i}: price '{raw_price}' completed to ${price}, the list price of {name}")
     if name is None:
         problems.append(f"shop {i}: unknown name '{raw_name}'")
     if price is None:
@@ -1135,6 +1167,7 @@ def _read_shop_slot(pic: np.ndarray, i: int, masks: dict, problems: list[str]) -
 
 def read_shop(pic: np.ndarray) -> dict:
     problems: list[str] = []
+    notes: list[str] = []     # values completed from the game data; not a reason to stop
     masks = text_masks(pic)
     st = store()
 
@@ -1165,8 +1198,16 @@ def read_shop(pic: np.ndarray) -> dict:
     if state["trainer"] is None:
         problems.append(f"trainer: unknown name '{t}'")
 
-    state["trainer_hp"] = number("hp")
     state["money"] = number("money", "$")
+    hp_text = text("hp")
+    state["trainer_hp"] = _to_int(hp_text)
+    if state["trainer_hp"] is None and state["day"] is not None:
+        from engine import data
+        state["trainer_hp"] = fill_number(hp_text, data.hp_for_day(state["day"]))
+        if state["trainer_hp"] is not None:
+            notes.append(f"hp: '{hp_text}' completed to {state['trainer_hp']}, the HP of day {state['day']}")
+    if state["trainer_hp"] is None:
+        problems.append(f"hp: cannot read '{hp_text}'")
 
     # "Rank 4 *67% *30% *3% *0% *0%"   (* = the rarity gem)
     r = text("rank_bar")
@@ -1191,12 +1232,13 @@ def read_shop(pic: np.ndarray) -> dict:
     if state["locked"] is None:
         problems.append(f"lock button: unknown look (label {width} px wide)")
 
-    state["shop"] = [_read_shop_slot(pic, i, masks, problems) for i in range(SHOP_SLOTS)]
+    state["shop"] = [_read_shop_slot(pic, i, masks, problems, notes) for i in range(SHOP_SLOTS)]
     state["team"] = [_read_owned_slot(pic, team_slot(i), f"team {i}", problems)
                      for i in range(TEAM_COLS * TEAM_ROWS)]
     state["bench"] = [_read_owned_slot(pic, bench_slot(i), f"bench {i}", problems)
                       for i in range(BENCH_SLOTS)]
     state["problems"] = problems
+    state["notes"] = notes
     return state
 
 
@@ -1239,6 +1281,8 @@ def comparable(state: dict) -> dict:
     """A state without the fields that change from frame to frame (for tests and expected files)."""
     state = json.loads(json.dumps(state))
     state.pop("saved_capture", None)
+    if not state.get("notes"):
+        state.pop("notes", None)          # expected files written before notes existed
     for slot in state.get("team", []) + state.get("bench", []):
         if slot:
             slot.pop("sprite_distance", None)

@@ -188,6 +188,10 @@ LESSONS = [
         "file": "captures/shop_day10_reroll.png",
         "text": {"shop0": "Humbolt|$25", "shop1": "Fumungus|$40"},
     },
+    {   # day 11: the first "9" in the HP bar
+        "file": "captures/shop_day11_hp.png",
+        "text": {"hp": "24900"},
+    },
 ]
 
 

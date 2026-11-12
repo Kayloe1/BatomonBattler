@@ -184,6 +184,7 @@ def main(argv=None) -> int:
     last_shop_state: dict | None = None
     played = False          # True once this session has acted inside a run
     last_shop: dict | None = None
+    seen_notes: list[str] = []
     while True:
         state = h.look()
         screen = state["screen"]
@@ -192,6 +193,10 @@ def main(argv=None) -> int:
             screen = state["screen"]
         if state["problems"]:
             return stop("; ".join(state["problems"]) + f" (capture: {state.get('saved_capture')})", state)
+        if state.get("notes") and state["notes"] != seen_notes:
+            seen_notes = state["notes"]
+            think(["Reading note (carried on; tell Claude so the glyph can be taught):"]
+                  + [f"  {n}" for n in seen_notes])
 
         if screen == "shop":
             played = True
