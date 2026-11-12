@@ -84,6 +84,10 @@ def battles_from_log(path: Path) -> list[dict]:
                 "captures": [seen.get("start_capture"), seen.get("result_capture")],
             }
             cases.append(open_case)
+        elif kind == "battle_stats" and open_case is not None:
+            open_case["stats"] = {"my_team": rec.get("my_team"), "opponent_team": rec.get("opponent_team"),
+                                  "end_hp_fraction": rec.get("end_hp_fraction"),
+                                  "problems": rec.get("problems", [])}
         elif kind == "day_result" and open_case is not None:
             if rec.get("badges", 0) > 0:
                 open_case["result"] = "win"
@@ -96,6 +100,45 @@ def battles_from_log(path: Path) -> list[dict]:
             open_case["result"] = "loss"         # the run ends on the last lost life
             open_case = None
     return cases
+
+
+def units_from_stats(lines: list | None) -> dict:
+    """Stats-window lines per slot (0-based list) -> the "a_units" format of sim/cases (1-based slots)."""
+    out = {}
+    for i, ln in enumerate(lines or []):
+        if ln is None:
+            continue
+        u = {k: v for k, v in ln.items() if k != "inflicted" and v is not None}
+        for status, n in (ln.get("inflicted") or {}).items():
+            if n is not None:
+                u[f"inflicted_{status.lower()}"] = n
+        out[str(i + 1)] = u
+    return out
+
+
+def stats_error(case: dict, seeds: int = 5) -> dict | None:
+    """How far the simulated per-monster numbers are from the Stats window (mean over seeds).
+
+    Returns {"rows": n, "mean_abs_error": x, "worst": [(label, real, sim)]} or None without stats.
+    """
+    st = case.get("stats")
+    if not st or case["problems"] or st.get("problems"):
+        return None
+    want = {"a": units_from_stats(st["my_team"]), "b": units_from_stats(st["opponent_team"])}
+    sums: dict[tuple, float] = {}
+    for seed in range(seeds):
+        r = simulate(case["a"], case["b"], seed=seed)
+        for side, idx in (("a", 0), ("b", 1)):
+            for slot, fields in want[side].items():
+                unit = next((u for u in r.units[idx] if str(u["slot"]) == slot), {})
+                for k, v in fields.items():
+                    sums[(side, slot, k, v)] = sums.get((side, slot, k, v), 0) + unit.get(k, 0)
+    rows = [(f"{side} slot {slot} {k}", v, round(tot / seeds, 1)) for (side, slot, k, v), tot in sums.items()]
+    if not rows:
+        return None
+    errs = sorted(rows, key=lambda r: -abs(r[1] - r[2]))
+    return {"rows": len(rows), "mean_abs_error": round(sum(abs(r[1] - r[2]) for r in rows) / len(rows), 1),
+            "worst": errs[:3]}
 
 
 def check(cases: list[dict], seeds: int = 5) -> dict:
@@ -143,9 +186,24 @@ def main(argv: list[str] | None = None) -> int:
         for c, sim, _ in res["rows"]:
             if sim is not None:
                 name = c["source"].replace(" ", "_").replace(":", "").replace(".jsonl", "")
+                expect: dict = {"result": c["result"]}
+                st = c.get("stats")
+                if st:
+                    expect["a_units"] = units_from_stats(st["my_team"])
+                    expect["b_units"] = units_from_stats(st["opponent_team"])
+                    expect["end_hp_fraction"] = st.get("end_hp_fraction")
                 (SAVE_DIR / f"{name}.json").write_text(json.dumps(
-                    {"source": c["source"], "a": c["a"], "b": c["b"], "expect": {"result": c["result"]}},
+                    {"source": c["source"], "a": c["a"], "b": c["b"], "expect": expect},
                     indent=1), encoding="utf-8")
+    errs = [(c, stats_error(c)) for c, sim, _ in res["rows"] if sim is not None]
+    errs = [(c, e) for c, e in errs if e]
+    for c, e in errs:
+        if args.verbose:
+            worst = "; ".join(f"{lab}: game {real}, sim {got}" for lab, real, got in e["worst"])
+            print(f"  day {c['day']} stats: mean error {e['mean_abs_error']} over {e['rows']} numbers; worst: {worst}")
+    if errs:
+        print(f"Stats window numbers compared on {len(errs)} battles: mean error "
+              f"{sum(e['mean_abs_error'] for _, e in errs) / len(errs):.1f} per number")
     n = res["usable"]
     pct = f"{100 * res['agree'] / n:.0f}%" if n else "-"
     print(f"{len(cases)} battles logged, {n} usable, simulator agrees on {res['agree']} ({pct}), "
