@@ -295,11 +295,15 @@ def main(argv=None) -> int:
                 return stop(f"after CONFIRM: {r.message} (capture: {(r.after or {}).get('saved_capture')})", r.after)
         elif screen == "event":
             h.last_image.save(hands_mod.CAPTURE_DIR / f"event_{datetime.now():%Y%m%d_%H%M%S}.png")
-            k = state["choices"] - 1
+            effects = state.get("effects") or [None] * state["choices"]
+            if brain:
+                k, lines = brain.event(last_shop_state, effects)
+            else:
+                k, lines = state["choices"] - 1, ["Event: simple rules take the last choice."]
             r = h.choose_event(k)
-            think([f"Event: I took the last of the {state['choices']} choices. I cannot read event text yet, "
-                   f"so this is a fixed rule, not a judgement. ({r.message})"])
-            log("event", choice=k, choices=state["choices"], ok=r.ok, message=r.message)
+            think(lines + [f"({r.message})"])
+            log("event", choice=k, choices=state["choices"], effects=effects, raw=state.get("raw"), why=lines,
+                ok=r.ok, message=r.message)
             if not r.ok:
                 return stop(f"after the event: {r.message} (capture: {(r.after or {}).get('saved_capture')})", r.after)
         else:

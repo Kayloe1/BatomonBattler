@@ -161,6 +161,25 @@ LESSONS = [
             (1, 0): ["Dealt 1 damage", "Triggered 1 time(s)"],
         },
     },
+    # Events: the effect line of each choice, top to bottom
+    {"file": "captures/event_20261111_105355.png",
+     "event": ["Turn a monster SHINY", "Gain Rainbow Berry", "Gain $20"]},
+    {"file": "captures/event_20261111_105558.png",
+     "event": ["Gain Talonite", "Gain Winged Fossil", "Gain $40"]},
+    {"file": "captures/event_mysterious_trainer.png",
+     "event": ["Get a Super Rare trinket gift", "Gain a random level 2 Super Rare monster", "Gain Mysterious Charm"]},
+    {"file": "captures/event_dragon_hoard.png",
+     "event": ["Gain Dragon Egg", "Gain Hero's Sword", "Gain $20"]},
+    {"file": "captures/event_20261112_090216.png",
+     "event": ["Randomly transform your monsters 1 rarity higher (max Mythical rarity)",
+               "Give a monster Electric typing and +5 Shock", "Gain Gold-o-matic"]},
+    {"file": "captures/event_20261112_132759.png",
+     "event": ["Gain a foreign Rare monster. It can now appear in your shop.", "Gain Kaleidoscope",
+               "Gain Fake Diamond"]},
+    {"file": "captures/event_baby_basilisk.png",
+     "event": ["Gain Ignit", "Get a Rare trinket gift", "Gain $40"]},
+    {"file": "captures/event_20261112_133833.png",
+     "event": ["Level up a monster (max level 4)", "Gain Research Notes", "Gain $60"]},
     {   # Chef day 10 (first "0" in the title font)
         "file": "captures/shop_chef_day10.png",
         "text": {"day": "DAY10"},
@@ -173,6 +192,18 @@ def _teach_digits(store: glyphs.GlyphStore, font: str, bitmaps: list[np.ndarray]
         raise ValueError(f"{where}: expected {len(digits)} digits, image has {len(bitmaps)}")
     for ch, bm in zip(digits, bitmaps):
         store.add(font, ch, bm)
+
+
+def teach_event(store: glyphs.GlyphStore, pic: np.ndarray, lesson: dict) -> None:
+    """Event choices: the effect line of each box, in the "event" font."""
+    lines = lesson.get("event")
+    if not lines:
+        return
+    boxes = reader.event_choices(pic)
+    if len(boxes) != len(lines):
+        raise ValueError(f"event: {len(lines)} choices expected, image has {len(boxes)}")
+    for box, text in zip(boxes, lines):
+        store.teach("event", reader.event_effect_mask(pic, box), text)
 
 
 def teach_stats(store: glyphs.GlyphStore, pic: np.ndarray, lesson: dict) -> None:
@@ -213,6 +244,7 @@ def main() -> None:
             else:
                 store.teach(font, mask, truth)
         teach_stats(store, pic, lesson)
+        teach_event(store, pic, lesson)
         for i, name in enumerate(lesson.get("trainer_cards", [])):
             store.teach("caps", glyphs.white(reader.crop(pic, reader._trainer_card_name(i))), name)
         for i, digits in lesson.get("shop_badges", {}).items():

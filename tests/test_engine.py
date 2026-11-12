@@ -206,5 +206,37 @@ class Explain(unittest.TestCase):
         self.assertNotIn("my choice", text)
 
 
+class Events(unittest.TestCase):
+    def state(self):
+        s = RunState(money=10, day=3)
+        s.team[0] = new_unit("Brawlmantis", 30)
+        s.team[1] = new_unit("Velocect", 15)
+        return s
+
+    def test_more_money_beats_less_and_unknowns_are_marked(self):
+        from engine import events
+        sc = events.score_choices(small_planner(), self.state(), ["Gain $20", "Gain $60", "Gain Hero's Sword"])
+        self.assertGreater(sc[1].value, sc[0].value)
+        self.assertTrue(sc[2].guess)
+
+    def test_recombobulator_is_never_taken(self):
+        from engine import events
+        k, lines = events.pick(small_planner(), self.state(), [
+            "RandomIy transform your monsters 1 rarity higher (max MythicaI rarity)", "Gain $20"])
+        self.assertEqual(k, 1)
+        self.assertIn("never", "\n".join(lines))
+
+    def test_level_up_is_simulated(self):
+        from engine import events
+        v, why, guess = events.score_effect(small_planner(), self.state(), "LeveI up a monster (max IeveI 4)")
+        self.assertGreater(v, 0)
+        self.assertFalse(guess)
+
+    def test_unreadable_choices_fall_back(self):
+        from engine import events
+        self.assertEqual(events.pick(small_planner(), self.state(), [None, None, None])[0], 2)
+        self.assertEqual(events.pick(small_planner(), self.state(), [None, "Gain $40", None])[0], 1)
+
+
 if __name__ == "__main__":
     unittest.main()

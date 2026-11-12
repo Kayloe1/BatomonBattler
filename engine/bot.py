@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from . import choices, data, model, opponents
+from . import choices, data, events, model, opponents
 from .evaluate import Evaluator
 from .planner import Params, Plan, Planner
 
@@ -60,6 +60,11 @@ class Brain:
             self.memory["trinkets"].append(offered[k])
             self.save()
         return k, why
+
+    def event(self, shop_state: dict | None, effects: list[str | None]) -> tuple[int, list[str]]:
+        """Best event choice for the team last seen in the shop, with the explanation lines."""
+        s = self.run_state(shop_state) if shop_state else model.RunState()
+        return events.pick(self.planner, s, effects)
 
     def trainer(self, offered: list[str | None]) -> tuple[int, str]:
         return choices.pick_trainer(offered)

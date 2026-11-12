@@ -142,7 +142,8 @@ EVENT_CHOICE_ROWS = (630, 1075)         # y range the choice boxes can be in
 def event_choices(pic: np.ndarray) -> list[Box]:
     """The white choice boxes of an event screen, top to bottom."""
     y0, y1 = EVENT_CHOICE_ROWS
-    col = pic[y0:y1, EVENT_CHOICE_COLUMN].min(axis=1) >= 240
+    # white at either column: coloured words in a long effect line can cross one of them
+    col = (pic[y0:y1, EVENT_CHOICE_COLUMN].min(axis=1) >= 240) | (pic[y0:y1, 1745].min(axis=1) >= 240)
     boxes, y = [], 0
     while y < len(col):
         if col[y]:
@@ -154,6 +155,45 @@ def event_choices(pic: np.ndarray) -> list[Box]:
         else:
             y += 1
     return boxes
+
+
+EVENT_TEXT = (82, 82, 90)                # the effect line of a choice (its title above is paler grey)
+# Effect lines seen so far. A line with glyphs the reader does not know yet is matched to these.
+KNOWN_EVENT_EFFECTS = [
+    "Turn a monster SHINY", "Gain Rainbow Berry", "Gain $20", "Gain $40", "Gain $60",
+    "Gain Talonite", "Gain Winged Fossil", "Get a Super Rare trinket gift", "Get a Rare trinket gift",
+    "Gain a random level 2 Super Rare monster", "Gain Mysterious Charm", "Gain Dragon Egg",
+    "Gain Hero's Sword", "Randomly transform your monsters 1 rarity higher (max Mythical rarity)",
+    "Give a monster Electric typing and +5 Shock", "Gain Gold-o-matic",
+    "Gain a foreign Rare monster. It can now appear in your shop.", "Gain Kaleidoscope",
+    "Gain Fake Diamond", "Gain Ignit", "Level up a monster (max level 4)", "Gain Research Notes",
+]
+
+
+def event_effect_mask(pic: np.ndarray, box: Box) -> np.ndarray:
+    """Text mask of a choice's effect line: dark text plus its coloured words (Rare, $40, ...)."""
+    x0, y0, x1, y1 = box
+    v = pic[y0 + 44:y1, x0:x1].astype(int)
+    mx, mn = v.max(axis=2), v.min(axis=2)
+    return (np.abs(v - np.array(EVENT_TEXT)).max(axis=2) <= 14) | ((mx - mn >= 70) & (mn <= 170))
+
+
+def read_event(pic: np.ndarray) -> dict:
+    """The choices of an event: {"choices": n, "effects": [text or None], "raw": [...]}.
+
+    An effect that cannot be read is None; that is not a "problem" (the bot can still pick by
+    its fallback rule), and the raw reading is kept for teaching.
+    """
+    boxes = event_choices(pic)
+    effects, raws = [], []
+    for box in boxes:
+        raw = store().read("event", event_effect_mask(pic, box), space_gap=7)
+        raws.append(raw)
+        # capital I and lowercase l are one glyph: a known line gives the right spelling
+        known = resolve(raw, KNOWN_EVENT_EFFECTS)
+        effects.append(known or (raw if raw and glyphs.UNKNOWN not in raw else None))
+    return {"choices": len(boxes), "effects": effects, "raw": raws,
+            "problems": [] if boxes else ["event: no choice boxes found"]}
 
 
 # Stat badge colours seen so far -> what the number means.
@@ -1102,8 +1142,7 @@ def read_state(image: Image.Image) -> dict:
     elif state["screen"] == "new_run":
         state.update(read_new_run(pic))
     elif state["screen"] == "event":
-        state["choices"] = len(event_choices(pic))
-        state["problems"] = [] if state["choices"] else ["event: no choice boxes found"]
+        state.update(read_event(pic))
     else:
         state["problems"] = [f"screen '{state['screen']}' cannot be read yet"]
     size = window.crop_picture(image).size
