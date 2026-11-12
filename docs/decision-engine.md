@@ -149,6 +149,23 @@ beat the ghost opponents in long battles but lost to real players. The pool was 
 Rerolling matters most: without it the engine fell to 3.1 badges. Expect the real numbers
 to move as real opponent teams get logged (PR #6) and replace the ghosts.
 
+## Fixes after the Chef/Chemist Casual runs (wasteful play)
+
+Ed watched a run (Chemist, 6 badges, lost Days 8-11 with $357 unspent on the last life) and listed
+what looked wrong. Logs showed each one:
+
+| Complaint | Cause | Fix |
+|---|---|---|
+| Barely uses items | Any paid item the planner had no rule for was skipped (Voucher, Apex Bait, Candies, Lootbox, Recruiting Flyer, Gold Powder, trinket gifts), and rollouts never had an item card | `model.item_outcomes` models them (random ones are averaged over their possible results); shops now roll an item card |
+| Hoards money | Past Day 7 every purchase scored +0.000 in the simulator, so "end turn" always won | `Planner.surplus`: money above a $20 reserve (none when a loss could end the run) is spent on rerolls (max 25 a day); a small team-strength tie-breaker (`power_weight`) |
+| Moves monsters around | Any layout gain, even 1e-9 of simulator noise, triggered a swap | A change must beat the current layout by `swap_gain` |
+| Keeps monsters it no longer needs | Selling a bench monster scored the same as keeping it | `Planner.dead_weight`: sold first unless on the team, a copy is on sale, a pair would merge into something that out-ranks the weakest fielded monster, an egg, or bought today |
+| Buy then sell the same monster | Greedy look-ahead valued "sell X, buy Y" right after buying X | Monsters bought this turn are never sold again that turn (`RunState.bought`, remembered by `Brain.note_action`) |
+
+Offline, same 12 seeds and shops (items included for both): old engine 0 of 12 runs won, 4.4 badges,
+45% of battles; new engine 3 of 12 runs won, 5.7 badges, 54% of battles. A small sample; read it as
+"clearly better", not as a promise.
+
 ## Speed
 
 About 5-20 s per shop decision on one core (more late in a run, when there is more money
