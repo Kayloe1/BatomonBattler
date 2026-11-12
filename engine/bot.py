@@ -46,6 +46,20 @@ class Brain:
             self.memory["last_day"], self.memory["last_lives"] = day, state["lives"]
         self.save()
 
+    def note_action(self, kind: str, state: dict, index: int | None = None) -> None:
+        """Remember what was done today (the screen does not show it): monsters bought are not sold
+        again today, and rerolls are counted so a spending spree has an end."""
+        day = state.get("day")
+        if self.memory.get("turn_day") != day:
+            self.memory.update(turn_day=day, bought=[], rerolls=0)
+        if kind == "buy" and index is not None:
+            card = (state.get("shop") or [None] * 5)[index]
+            if card and card.get("kind") == "monster" and card.get("name"):
+                self.memory["bought"].append(card["name"])
+        elif kind == "reroll":
+            self.memory["rerolls"] = self.memory.get("rerolls", 0) + 1
+        self.save()
+
     # -- decisions --
     def run_state(self, state: dict) -> model.RunState:
         return model.from_reader(state, self.memory)

@@ -231,6 +231,7 @@ def main(argv=None) -> int:
                     log(a.kind, action=str(a), why=a.why, ok=r.ok, message=r.message)
                     if not r.ok:
                         return stop(f"{a} failed: {r.message} (capture: {(r.after or {}).get('saved_capture')})", r.after)
+                    brain.note_action(a.kind, state, a.index)
                     continue
                 # end of the turn: lock, moves, then battle
                 for b in plan.actions[:-1]:

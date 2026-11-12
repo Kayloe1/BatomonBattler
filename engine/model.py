@@ -107,10 +107,12 @@ class RunState:
     hp_today: int | None = None               # trainer HP read on the shop screen
     odds: tuple[int, ...] | None = None       # shop odds read on the rank bar
     reroll_price: int = data.REROLL_PRICE
+    bought: list[str] = field(default_factory=list)   # monsters bought this turn (never sold again today)
+    rerolls: int = 0                                  # rerolls paid for this turn
 
     def copy(self) -> "RunState":
         return replace(self, trinkets=list(self.trinkets), shop=list(self.shop), team=list(self.team),
-                       bench=list(self.bench), gifts=list(self.gifts))
+                       bench=list(self.bench), gifts=list(self.gifts), bought=list(self.bought))
 
     # -- views --
     def owned(self) -> list[tuple[str, int, Unit]]:
@@ -165,6 +167,7 @@ def buy(s: RunState, i: int) -> RunState:
     price = card_price(t, card)
     t.money -= price
     t.shop[i] = None
+    t.bought.append(card.name)
     sp = data.species(card.name)
     if sp and sp.is_bug:
         _grow_on_bug_buy(t)
@@ -251,10 +254,117 @@ def move(s: RunState, src: tuple[str, int], dst: tuple[str, int]) -> RunState:
 # Items whose effect is modelled. Anything else that costs $0 is used anyway
 # unless it is in AVOID_ITEMS; paid unmodelled items are skipped.
 AVOID_ITEMS = {"Recombobulator", "Magic Lasso"}
+GIFT_ITEMS = {"Dowsing Rod": "Common", "Purple Gift": "Super Rare", "Golden Gift": "Legendary"}
+CANDIES = {"Basic Candy": ("Common", "Uncommon"), "Rare Candy": data.RARITIES}
+MAX_OUTCOMES = 6          # random items are scored on a sample of their possible results
+
+
+def _add_unit(t: RunState, unit: Unit) -> bool:
+    """Put a new unit in the first free slot (a Lv1 copy may merge at once). False when there is no room."""
+    place = _first_free(t)
+    if place is None:
+        lv1 = sum(1 for _, _, u in t.owned() if u.name == unit.name and u.level == unit.level)
+        if unit.level == 1 and lv1 == 2:
+            t.bench.append(unit)
+            _merge(t, unit.name)
+            return True
+        return False
+    t.set_slot(*place, unit)
+    _merge(t, unit.name)
+    return True
+
+
+def _level_up(u: Unit) -> Unit:
+    """The unit one level higher, keeping what it grew (what a Candy does)."""
+    sp = u.species
+    new = u.level + 1
+    if sp is None or new > 3:
+        return u
+    base = sp.stats(new)
+    grown = u.growth()
+    stats = {k: base.get(k, 0) + grown.get(k, 0) for k in data.STATS}
+    stats["multicast"] = base.get("multicast", 1)
+    return replace(u, level=new, copies=data.COPIES_FOR_LEVEL.get(new, u.copies)).with_stats(stats)
+
+
+def item_outcomes(s: RunState, i: int) -> list[RunState]:
+    """The states an item can lead to, all equally likely. One state for a certain item, none when
+    the item cannot be used (no room, nothing to level)."""
+    card = s.shop[i]
+    t = s.copy()
+    t.money -= card.price
+    t.shop[i] = None
+    name = card.name
+    if name == "Voucher":
+        outs = []
+        for j, c in enumerate(s.shop):
+            if c and c.kind == "monster" and c.name:
+                u = s.copy()
+                u.money -= card.price
+                u.shop[i] = None
+                u.items_left -= 1
+                u.shop[j] = replace(c, price=0)
+                if can_buy(u, j):
+                    outs.append(buy(u, j))
+        return outs
+    if name == "Apex Bait":
+        t.items_left -= 1
+        t.rank = min(t.rank + 1, 13)
+        t.odds = None
+        return [t]
+    if name in CANDIES:
+        t.items_left -= 1
+        kinds = CANDIES[name]
+        outs = []
+        for w, k, u in t.owned():
+            if u.level == 1 and u.species and u.species.rarity in kinds:
+                u2 = t.copy()
+                u2.set_slot(w, k, _level_up(u))
+                outs.append(u2)
+        return outs
+    if name == "Lootbox":
+        t.items_left -= 1
+        outs = []
+        for sp in data.by_rarity("Legendary"):
+            u = t.copy()
+            if _add_unit(u, new_unit(sp.name, 0)):
+                outs.append(u)
+        return outs
+    if name == "Recruiting Flyer":
+        t.items_left -= 1
+        outs = []
+        for sp in data.by_rarity("Uncommon"):
+            u = t.copy()
+            if _add_unit(u, new_unit(sp.name, sp.cost * 3, 3)):
+                outs.append(u)
+        return outs
+    if name == "Gold Powder":
+        t.items_left -= 1
+        outs = []
+        for w, k, u in t.owned():
+            u2 = t.copy()
+            u2.set_slot(w, k, replace(u, sell_value=u.sell_price() + 20))
+            outs.append(u2)
+        return outs
+    if name in GIFT_ITEMS:
+        t.items_left -= 1
+        t.gifts.append(GIFT_ITEMS[name])
+        return [t]
+    return [use_item(s, i)]
 
 
 def use_item(s: RunState, i: int, rng: random.Random | None = None) -> RunState:
     card = s.shop[i]
+    if card.name in ("Voucher", "Apex Bait", "Lootbox", "Recruiting Flyer", "Gold Powder", "Basic Candy",
+                     "Rare Candy") or card.name in GIFT_ITEMS:
+        outs = item_outcomes(s, i)
+        if not outs:                      # nothing to act on: the item is just spent
+            t = s.copy()
+            t.money -= card.price
+            t.shop[i] = None
+            t.items_left -= 1
+            return t
+        return (rng or random.Random(0)).choice(outs)
     t = s.copy()
     t.money -= card.price
     t.shop[i] = None
@@ -308,6 +418,14 @@ def use_item(s: RunState, i: int, rng: random.Random | None = None) -> RunState:
     return t
 
 
+MODELLED_ITEMS = {"Cake", "Feast", "Pom Berry", "Coupon", "Fake Coin", "Lucky Coin", "Gray Chip",
+                  "Black Sludge", "Hot Pepper", "Battery Pack", "Shiny Pebble", "Mystic Pearl",
+                  "Tote Bag", "Nana Berry", "Focus Pill", "Green Stone", "Gray Ticket", "Green Ticket",
+                  "Blue Ticket", "Purple Ticket", "Golden Ticket", "Coffee",
+                  "Voucher", "Apex Bait", "Basic Candy", "Rare Candy", "Lootbox", "Recruiting Flyer",
+                  "Gold Powder", "Dowsing Rod", "Purple Gift", "Golden Gift"}
+
+
 def item_is_worth_using(s: RunState, card: Card) -> bool:
     """Items the planner may use. Unmodelled paid items are skipped."""
     if card.name in AVOID_ITEMS:
@@ -319,11 +437,7 @@ def item_is_worth_using(s: RunState, card: Card) -> bool:
         # turns a random Common into an Uncommon: not when that could hit a grown or levelled Common
         return not any(u.species and u.species.rarity == "Common" and (u.level > 1 or u.growth())
                        for _, _, u in s.owned())
-    modelled = {"Cake", "Feast", "Pom Berry", "Coupon", "Fake Coin", "Lucky Coin", "Gray Chip",
-                "Black Sludge", "Hot Pepper", "Battery Pack", "Shiny Pebble", "Mystic Pearl",
-                "Tote Bag", "Nana Berry", "Focus Pill", "Green Stone", "Gray Ticket", "Green Ticket",
-                "Blue Ticket", "Purple Ticket", "Golden Ticket", "Coffee"}
-    return card.price == 0 or card.name in modelled
+    return card.price == 0 or card.name in MODELLED_ITEMS
 
 
 def reroll(s: RunState, rng: random.Random) -> RunState:
@@ -332,6 +446,7 @@ def reroll(s: RunState, rng: random.Random) -> RunState:
         t.free_rerolls -= 1
     else:
         t.money -= t.reroll_price
+    t.rerolls += 1
     t.shop = random_shop(t.rank, rng, t.trainer, t.odds)
     return t
 
@@ -346,8 +461,22 @@ def random_shop(rank: int, rng: random.Random, trainer: str | None = None,
         rarity = rng.choices(data.RARITIES, weights=odds)[0]
         sp = rng.choice(data.by_rarity(rarity))
         cards.append(Card(sp.name, sp.cost, "monster", tuple(sorted(sp.stats(1).items())), rarity))
-    cards.append(None)          # the item slot is not modelled in rollouts
+    cards.append(_random_item(rank, rng, odds))
     return cards
+
+
+# Items that appear in the fifth shop slot (Mythical ones and unknown effects left out)
+_SHOP_ITEM_SKIP = {"Red Coin", "Magic Lasso", "Crimson Gift", "Crimson Ticket", "Black Feather",
+                   "Shiny Berry", "Ultra Candy", "Coffee", "Focus Pill"}
+
+
+def _random_item(rank: int, rng: random.Random, odds) -> Card | None:
+    rarity = rng.choices(data.RARITIES, weights=odds)[0]
+    pool = [n for n, it in data.items().items() if it["rarity"] == rarity and n not in _SHOP_ITEM_SKIP]
+    if not pool:
+        return None
+    n = rng.choice(pool)
+    return Card(n, data.items()[n]["cost"], "item", (), rarity)
 
 
 # ------------------------------------------------------- reader -> state ----
@@ -389,6 +518,7 @@ def from_reader(state: dict, memory: dict | None = None) -> RunState:
     monster cost, whether the rescue was used); play.py keeps it between calls.
     """
     memory = memory or {}
+    same_turn = memory.get("turn_day") == state.get("day")        # what happened earlier today
     paid = memory.get("paid", {})
     team = [unit_from_reader(s, paid.get(f"team{i}")) for i, s in enumerate(state.get("team") or [None] * 6)]
     bench = [unit_from_reader(s, paid.get(f"bench{i}")) for i, s in enumerate(state.get("bench") or [None] * 4)]
@@ -402,4 +532,6 @@ def from_reader(state: dict, memory: dict | None = None) -> RunState:
         hp_today=state.get("trainer_hp"),
         odds=tuple(state["shop_odds"].get(r, 0) for r in data.RARITIES) if state.get("shop_odds") else None,
         reroll_price=state.get("reroll_price") or data.REROLL_PRICE,
+        bought=list(memory.get("bought", [])) if same_turn else [],
+        rerolls=int(memory.get("rerolls", 0)) if same_turn else 0,
     )

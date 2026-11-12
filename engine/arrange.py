@@ -118,7 +118,8 @@ def layout_to_slots(team: list[Unit | None], rest: list[Unit | None]) -> tuple[l
     return list(team), bench
 
 
-def improve(team: list[Unit | None], bench: list[Unit | None], scorer, max_rounds: int = 3):
+def improve(team: list[Unit | None], bench: list[Unit | None], scorer, max_rounds: int = 3,
+            min_gain: float = 1e-9):
     """Hill-climb over swaps of the 10 slots; scorer(team) -> float, higher is better."""
     team, bench = list(team), list(bench)
     best = scorer(team)
@@ -144,7 +145,7 @@ def improve(team: list[Unit | None], bench: list[Unit | None], scorer, max_round
             if t2 == team:
                 continue
             v = scorer(t2)
-            if v > best + 1e-9:
+            if v > best + min_gain:
                 team, bench, best = t2, b2, v
                 improved = True
         if not improved:

@@ -20,8 +20,11 @@ The weights live in `Params` and were tuned by playing whole runs offline
 """
 from __future__ import annotations
 
+import math
 import random
 from dataclasses import dataclass, field, replace
+
+import knowledge
 
 from . import data, model
 from .arrange import heuristic_layout, improve, power
@@ -45,7 +48,12 @@ class Params:
     money: float = 0.003       # value of $1 carried to tomorrow ...
     money_cap: int = 40        # ... up to this much; more saved money buys nothing extra
     bench_money: float = 0.8   # share of the monsters' sell value counted as money
-    copy_progress: float = 0.03
+    copy_progress: float = 0.04
+    power_weight: float = 0.05   # tie-breaker: a stronger fielded team is better even when the simulator's
+                                 # score is flat (late days, where every purchase looks equally hopeless)
+    swap_gain: float = 0.004     # a layout change must beat the current layout by this much (no shuffling)
+    reserve: int = 20            # money worth keeping; anything above it is spent (rerolls hunt for merges)
+    max_rerolls: int = 25        # surplus rerolls per day
     gift_scale: float = 1.0
     reroll_samples: int = 3
     lock_gain: float = 0.06
@@ -147,7 +155,10 @@ class Planner:
         return v
 
     def quick(self, s: RunState, team, bench) -> float:
-        return self.team_score(s, team, self.p.k_quick) + self.extras(s, bench)
+        v = self.team_score(s, team, self.p.k_quick) + self.extras(s, bench)
+        if self.p.power_weight:
+            v += self.p.power_weight * math.log1p(sum(power(u) for u in team if u is not None))
+        return v
 
     # -------------------------------------------------------- arrangement ----
     def arrange_full(self, s: RunState, hint=None) -> tuple[list, list]:
@@ -165,8 +176,12 @@ class Planner:
             cands.append((list(ht), (hr + [None] * 4)[:4]))
         cands = [c for c in cands if _same_units(c, owned)] or cands[:1]
         f = lambda t: self.team_score(s, t, self.p.k_quick)
-        best = max(cands, key=lambda tb: f(tb[0]))
-        team, bench, _ = improve(best[0], best[1], f, max_rounds=self.p.final_rounds)
+        best, best_v = cands[0], f(cands[0][0])          # the layout as it is wins unless clearly beaten
+        for c in cands[1:]:
+            v = f(c[0])
+            if v > best_v + self.p.swap_gain:
+                best, best_v = c, v
+        team, bench, _ = improve(best[0], best[1], f, max_rounds=self.p.final_rounds, min_gain=self.p.swap_gain)
         self._arranged[key] = (team, bench)
         return team, bench
 
@@ -210,7 +225,7 @@ class Planner:
                 t2, b2 = list(team), list(bench)
                 t2[j], b2[i] = bench[i], team[j]
                 v = f(t2)
-                if v > best_v + 1e-9:
+                if v > best_v + (1e-9 if i in fresh else self.p.swap_gain):
                     best_t, best_b, best_v = t2, b2, v
         rest = [u for u in best_b if u is not None]
         if len(rest) > data.BENCH_SLOTS:          # cannot happen in the game; keep the strongest
@@ -246,45 +261,101 @@ class Planner:
         return v
 
     # --------------------------------------------------------- candidates ----
-    def _candidates(self, s: RunState) -> list[tuple[str, list[Action], RunState]]:
-        out: list[tuple[str, list[Action], RunState]] = []
+    @staticmethod
+    def _sellable(s: RunState, u: Unit) -> bool:
+        """Units a sale may be considered for: never one bought this turn (that is a wasted purchase
+        and half its price), never an egg (it hatches on the bench), never one the reader cannot name."""
+        return u.name is not None and u.name not in s.bought and not knowledge.is_egg(u.name)
+
+    def _item_states(self, s: RunState, i: int, c) -> list[RunState]:
+        """The states an item can lead to (a sample when it is random)."""
+        if c.name == "Apex Bait":
+            # ranking the shop up only pays through the rerolls that follow: score it with one
+            if s.money < c.price + s.reroll_price:
+                return []
+            up = model.item_outcomes(s, i)[0]
+            return [model.reroll(up, self.rng) for _ in range(max(2, self.p.reroll_samples))]
+        outs = model.item_outcomes(s, i)
+        if len(outs) > model.MAX_OUTCOMES:
+            outs = self.rng.sample(outs, model.MAX_OUTCOMES)
+        return outs
+
+    def _candidates(self, s: RunState) -> list[tuple[str, list[Action], list[RunState]]]:
+        """(label, actions, resulting states); several states when the result is random (their value is
+        averaged)."""
+        out: list[tuple[str, list[Action], list[RunState]]] = []
         for i, c in enumerate(s.shop):
             if c is None or c.name is None:
                 continue
             if c.kind == "item":
                 if c.price <= s.money and s.items_left > 0 and model.item_is_worth_using(s, c) \
                         and c.name not in TICKETS:
-                    out.append((f"use {c.name}", [Action("item", i)], model.use_item(s, i)))
+                    states = self._item_states(s, i, c)
+                    if states:
+                        out.append((f"use {c.name}", [Action("item", i)], states))
                 continue
             if model.can_buy(s, i):
                 t = model.buy(s, i)
-                out.append((f"buy {c.name} ${c.price}", [Action("buy", i)], t))
+                out.append((f"buy {c.name} ${c.price}", [Action("buy", i)], [t]))
                 sp = data.species(c.name)
                 # fodder loop: a Bug bought for its growth on Guardiant, then sold
                 if sp and sp.is_bug and any(u.species and u.species.bug_growth for _, _, u in s.owned()):
                     new = _new_slot(s, t, c.name)
                     if new is not None and t.slot(*new).level == 1:
                         out.append((f"feed {c.name} to Guardiant (buy, then sell)", [Action("buy", i)],
-                                    model.sell(t, *new)))
+                                    [model.sell(t, *new)]))
             # sell first when money or space is short
             if c.price > s.money or not model.can_buy(s, i):
-                for w, k, u in sorted(s.owned(), key=lambda x: power(x[2]))[:3]:
-                    if u.name == c.name or u.name is None:
+                for w, k, u in sorted((x for x in s.owned() if self._sellable(s, x[2])),
+                                      key=lambda x: power(x[2]))[:3]:
+                    if u.name == c.name:
                         continue
                     t = model.sell(s, w, k)
                     if model.can_buy(t, i):
                         out.append((f"sell {u.name} to buy {c.name}", [Action("sell", src=(w, k))],
-                                    model.buy(t, i)))
-        team_weak = sorted(((w, k, u) for w, k, u in s.owned() if w == TEAM), key=lambda x: power(x[2]))[:2]
-        for w, k, u in [x for x in s.owned() if x[0] == BENCH] + team_weak:
-            if u.name is None:
-                continue                      # a monster the reader cannot name is kept
-            out.append((f"sell {u.name}", [Action("sell", src=(w, k))], model.sell(s, w, k)))
+                                    [model.buy(t, i)]))
+        team_weak = sorted(((w, k, u) for w, k, u in s.owned() if w == TEAM and self._sellable(s, u)),
+                           key=lambda x: power(x[2]))[:2]
+        for w, k, u in [x for x in s.owned() if x[0] == BENCH and self._sellable(s, x[2])] + team_weak:
+            out.append((f"sell {u.name}", [Action("sell", src=(w, k))], [model.sell(s, w, k)]))
+        return out
+
+    # ------------------------------------------------------------ clean-up ----
+    def dead_weight(self, s: RunState, team) -> list[tuple[str, int, Unit]]:
+        """Bench monsters that will never play: they are not on the team, will not join it, and are not
+        two copies away from a merge that would make them good enough to. Selling them frees a bench slot
+        and turns them into money that buys something useful.
+
+        Kept: eggs (they hatch), a monster a shop card could merge (a third copy is on sale right now),
+        a pair of copies whose merged form would out-rank the weakest fielded monster, anything the
+        reader cannot name, and anything bought this turn."""
+        fielded = [u for u in team if u is not None]
+        if len(fielded) < 4 and s.day < 6:
+            return []                            # early on the bench is a waiting room, not a cost
+        weakest = min((power(u) for u in fielded), default=0.0)
+        on_sale = {c.name for c in s.shop if c and c.kind == "monster" and c.name}
+        owned = [u for _, _, u in s.owned()]
+        out = []
+        for k, u in enumerate(s.bench):
+            if u is None or not self._sellable(s, u) or u.sell_price() <= 0 and u.growth():
+                continue
+            if u.name in on_sale:
+                continue
+            copies = sum(1 for o in owned if o.name == u.name and o.level == u.level)
+            need = 3 if u.level == 1 else 2
+            if u.level < 3 and copies >= need - 1:
+                nxt = model.new_unit(u.name, 0, u.level + 1)
+                if power(nxt) > 1.1 * weakest:
+                    continue                     # a merge here would improve the team: worth holding
+            if power(u) > weakest and not any(o is u for o in team):
+                # stronger than the weakest fielded monster: the arrangement will use it, not a dead weight
+                continue
+            out.append((BENCH, k, u))
         return out
 
     def _reroll_value(self, s: RunState, team, bench) -> float | None:
         free = s.free_rerolls > 0
-        if self.p.reroll_samples <= 0:
+        if self.p.reroll_samples <= 0 or s.rerolls >= self.p.max_rerolls:
             return None
         if not free and s.money < s.reroll_price + 5:
             return None
@@ -300,14 +371,23 @@ class Planner:
         """The next action(s) for this shop state."""
         notes: list[str] = []
         team, bench = self.arrange_full(s)
+        # 0. monsters that will never play: sell them first, so the bench has room and the money is spent
+        for w, k, u in self.dead_weight(s, team):
+            win = self.win_today(s, team) if any(team) else 0.0
+            return Plan([Action("sell", src=(w, k), why=f"sell {u.name}: it will never play (not on the team, "
+                                                       f"no merge in reach)", value=0.0)],
+                        0.0, notes, considered=[], win_now=win)
         base = self.quick(s, team, bench)
         base_finish = self.finish(s, team, bench, base)
         best_label, best_actions, best_v = "end turn", [], base
         considered = []
         win_now = self.win_today(s, team) if any(team) else 0.0
-        for label, actions, t in self._candidates(s):
-            v, team2, bench2 = self.evaluate_after(s, t, team, bench)
-            v = self.finish(t, team2, bench2, v)
+        for label, actions, states in self._candidates(s):
+            total = 0.0
+            for t in states:
+                v, team2, bench2 = self.evaluate_after(s, t, team, bench)
+                total += self.finish(t, team2, bench2, v)
+            v = total / len(states)
             considered.append((label, v - base))
             if v > best_v + self.p.min_gain:
                 best_label, best_actions, best_v = label, actions, v
@@ -322,7 +402,7 @@ class Planner:
                 a.why, a.value = best_label, best_v
             return Plan(best_actions, best_v, notes + [f"{best_label}: {best_v - base:+.3f}"],
                         considered=considered, win_now=win_now)
-        # nothing beats ending the turn: tickets, lock, then arrange and battle
+        # nothing beats ending the turn: tickets, free buffs, spend the surplus, lock, arrange and battle
         for i, c in enumerate(s.shop):
             if c and c.kind == "item" and c.name in TICKETS and c.price <= s.money and s.items_left > 0:
                 return Plan([Action("item", i, why=f"use {c.name} (shop of one rarity)")], base, notes,
@@ -332,6 +412,12 @@ class Planner:
                 if c and c.kind == "item" and c.name in FREE_BUFFS and c.price == 0:
                     return Plan([Action("item", i, why=f"use free {c.name}")], base, notes,
                                 considered=considered, win_now=win_now)
+        spare = self.surplus(s)
+        if spare >= s.reroll_price and s.rerolls < self.p.max_rerolls:
+            return Plan([Action("reroll", why=f"spend the surplus: ${s.money} in hand, ${spare} more than is "
+                                              f"worth keeping, and a reroll is the only way left to turn it "
+                                              f"into a stronger team", value=base)],
+                        base, notes + ["surplus reroll"], considered=considered, win_now=win_now)
         actions: list[Action] = []
         lock = self._lock_choice(s, team, bench, base)
         if lock:
@@ -341,6 +427,13 @@ class Planner:
         notes.append(f"expected win chance today {win:.0%}")
         actions.append(Action("battle", why=f"expected win chance {win:.0%}"))
         return Plan(actions, base, notes, considered=considered, win_now=win)
+
+    def surplus(self, s: RunState) -> int:
+        """Money above what is worth carrying into tomorrow. Unspent money wins no battles: with $300 in
+        hand and nothing worth buying, rerolling (the shop, and its item slot) is the way to find
+        merges, higher-tier monsters and items. Nothing is kept when a loss today could end the run."""
+        reserve = 0 if s.lives <= data.lives_lost(s.day) else self.p.reserve
+        return max(0, s.money - reserve)
 
     def _lock_choice(self, s: RunState, team, bench, base: float) -> str | None:
         if s.locked:

@@ -50,7 +50,7 @@ def simple_policy_turn(s: RunState, rng: random.Random) -> RunState:
 
 
 def engine_turn(s: RunState, planner: Planner, rng: random.Random, log: list | None = None) -> RunState:
-    for _ in range(40):
+    for _ in range(90):
         plan = planner.decide(s)
         a = plan.actions[0]
         if log is not None and a.kind not in ("move", "battle", "lock"):
@@ -58,7 +58,7 @@ def engine_turn(s: RunState, planner: Planner, rng: random.Random, log: list | N
         if a.kind == "buy":
             s = model.buy(s, a.index)
         elif a.kind == "item":
-            s = model.use_item(s, a.index)
+            s = model.use_item(s, a.index, rng)
         elif a.kind == "sell":
             s = model.sell(s, *a.src)
         elif a.kind == "reroll":
@@ -95,6 +95,7 @@ def play_run(seed: int, policy: str, params: Params | None = None, pool_n: int =
         s.day, s.rank = day, day
         s.money += data.income(day)
         s.items_left = 1
+        s.bought, s.rerolls = [], 0
         s.gifts = []
         s.shop = locked_shop if locked_shop else model.random_shop(s.rank, shop_rng)
         s.locked = False
