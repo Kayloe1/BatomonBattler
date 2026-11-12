@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from itertools import combinations
 
+import knowledge
+
 from . import data
 from .model import Unit
 
@@ -23,7 +25,12 @@ IN_FRONT_GIVER = {"Saberhorn", "Zephyrex"}
 BEHIND_GIVER = {"Dracana", "Boomagon", "Onsetra", "Pylong", "Blixie"}
 ADJACENT_BUFFER = {"Formiqueen", "Gaiadrasil", "Noxnimbus", "Aster", "Cherubble", "Ironcore",
                    "Torrantler", "Puffloon", "Stellagon", "Geminiss", "Aegistruct"}
-BENCH_ONLY = {"Dragon Egg"}        # useless on the team (Ed's rule from Run 15)
+# never fielded: eggs do nothing on the team; Dirgefin knocks out every Common on both sides
+BENCH_ONLY = {"Dragon Egg", "Purple Egg"} | set(knowledge.NEVER_FIELD)
+
+
+def bench_only(u: Unit | None) -> bool:
+    return u is not None and (u.name in BENCH_ONLY or knowledge.is_egg(u.name))
 
 
 def power(u: Unit | None, fight: float = FIGHT_SECONDS) -> float:
@@ -33,7 +40,7 @@ def power(u: Unit | None, fight: float = FIGHT_SECONDS) -> float:
     sp = u.species
     if sp is None:
         return 0.0
-    if u.name in BENCH_ONLY:
+    if bench_only(u):
         return 0.0
     d = u.stat_dict()
     cd = sp.level_cooldown.get(u.level, sp.cooldown) or sp.cooldown
@@ -62,7 +69,7 @@ def neighbours(i: int) -> list[int]:
 def heuristic_layout(units: list[Unit]) -> tuple[list[Unit | None], list[Unit | None]]:
     """Returns (team[6], rest) from a list of owned units."""
     pool = sorted([u for u in units if u is not None], key=power, reverse=True)
-    fielders = [u for u in pool if u.name not in BENCH_ONLY]
+    fielders = [u for u in pool if not bench_only(u)]
     team: list[Unit | None] = [None] * 6
     chosen = fielders[:6]
     rest = [u for u in pool if u not in chosen or chosen.count(u) < 1]
@@ -129,6 +136,8 @@ def improve(team: list[Unit | None], bench: list[Unit | None], scorer, max_round
                 continue
             if (ua is not None and ua.name is None) or (ub is not None and ub.name is None):
                 continue            # a monster the reader cannot name stays where it is
+            if (a[0] == "t" and bench_only(ub)) or (b[0] == "t" and bench_only(ua)):
+                continue            # never move an egg or Dirgefin onto the team
             t2, b2 = list(team), list(bench)
             (t2 if a[0] == "t" else b2)[a[1]] = ub
             (t2 if b[0] == "t" else b2)[b[1]] = ua

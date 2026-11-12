@@ -16,12 +16,14 @@ from __future__ import annotations
 import csv
 import re
 
+import knowledge
+
 from . import data
 from .model import RunState
 from .planner import Planner
 
-AVOID_TRAINERS = {"Mad Scientist": "replaces the team with random monsters mid-run",
-                  "Gentleman": "stops Common and Uncommon monsters, the base of early merges"}
+AVOID_TRAINERS = knowledge.AVOID_TRAINERS
+PREFERENCE_BONUS = 0.05     # small tie-breaker for trainers that did well in September
 
 
 def trainer_scores() -> dict[str, float]:
@@ -33,6 +35,8 @@ def trainer_scores() -> dict[str, float]:
             score = (won + 1) / (played + 3)          # smoothed win share
             if r["name"] in AVOID_TRAINERS:
                 score -= 1.0
+            if r["name"] in knowledge.TRAINER_PREFERENCE:
+                score += PREFERENCE_BONUS
             out[r["name"]] = score
     return out
 

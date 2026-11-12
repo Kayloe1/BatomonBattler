@@ -120,11 +120,20 @@ front = right, above, adjacent is orthogonal), amplifier pieces, eggs stay on th
 Dirgefin and self-knockout monsters judged by the simulator rather than banned, and the
 same-row drag rule.
 
-## Offline results
+## Offline results (2026-11-12)
 
-See the pull request description for the latest numbers. They measure the engine
-against the old simple rules on identical shops and opponents; they are only as good as
-the simulator and the opponent pool, so the real test is Casual runs.
+Same shop seeds for both, opponents from the held-out pool (`--first-seed 2000`):
+
+| Policy | Runs | Runs won | Mean badges | Battles won |
+|---|---|---|---|---|
+| Old simple rules | 300 | 0.7% | 2.8 | 32% |
+| Engine | 24 | 96% (23) | 9.96 | 81% |
+
+The engine still loses many of its first three days (the board is small and the shop is
+luck), then wins most battles from day 4. These numbers are only as good as the simulator
+and the opponent pool: the pool is known to be easier than real players (the simple
+rules win 32% of simulated battles but won 3 of 14 real ones), and the simulator may
+over-value heals (step 3 notes). Expect real results to be lower; the real test is Casual runs.
 
 ## Speed
 

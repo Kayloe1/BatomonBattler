@@ -250,7 +250,7 @@ def move(s: RunState, src: tuple[str, int], dst: tuple[str, int]) -> RunState:
 
 # Items whose effect is modelled. Anything else that costs $0 is used anyway
 # unless it is in AVOID_ITEMS; paid unmodelled items are skipped.
-AVOID_ITEMS = {"Basic Bait", "Recombobulator"}
+AVOID_ITEMS = {"Basic Bait", "Recombobulator", "Magic Lasso"}
 
 
 def use_item(s: RunState, i: int, rng: random.Random | None = None) -> RunState:
@@ -313,8 +313,12 @@ def item_is_worth_using(s: RunState, card: Card) -> bool:
     if card.name in AVOID_ITEMS:
         return False
     if card.name == "Red Coin":
-        # a life is worth far more than $20 unless lives are plentiful
+        # money for a life: only when that life cannot change where the next loss leaves you
         return s.lives >= 8 and s.day <= 4
+    if card.name == "Green Stone":
+        # turns a random Common into an Uncommon: not when that could hit a grown or levelled Common
+        return not any(u.species and u.species.rarity == "Common" and (u.level > 1 or u.growth())
+                       for _, _, u in s.owned())
     modelled = {"Cake", "Feast", "Pom Berry", "Coupon", "Fake Coin", "Lucky Coin", "Gray Chip",
                 "Black Sludge", "Hot Pepper", "Battery Pack", "Shiny Pebble", "Mystic Pearl",
                 "Tote Bag", "Nana Berry", "Focus Pill", "Green Stone", "Gray Ticket", "Green Ticket",
