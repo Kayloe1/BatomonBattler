@@ -179,5 +179,54 @@ class NameResolution(unittest.TestCase):
         self.assertEqual(reader.resolve("RICH LADY", reader.TRAINER_NAMES, ignore_case=True), "Rich Lady")
 
 
+def _canonical(name: str):
+    import numpy as np
+    path = CAPTURES / name
+    if not path.exists():
+        return None
+    return np.asarray(window.canonical_picture(Image.open(path).convert("RGB")))
+
+
+class BattleScreen(unittest.TestCase):
+    """Both teams read from the first frames of the Day 2 battle (checked by eye)."""
+
+    def test_both_teams_at_battle_start(self):
+        pic = _canonical("battle_day2.png")
+        if pic is None:
+            self.skipTest("captures/battle_day2.png not here")
+        seen = reader.read_battle(pic)
+        self.assertEqual(seen["problems"], [])
+
+        def short(slot):
+            return slot and (slot["name"], slot["level"], {b["stat"]: b["value"] for b in slot["stats"]})
+
+        self.assertEqual([short(s) for s in seen["my_team"]], [
+            ("Brawlmantis", 1, {"damage": 50}),
+            ("Venopuff", 1, {"damage": 5, "poison": 4}),
+            ("Dribblet", 1, {"heal": 20}),
+            None,
+            ("Mosslug", 1, {"damage": 5, "heal": 30}),
+            ("Panbud", 1, {"damage": 25}),
+        ])
+        # The Dragon Egg (event reward) is never in the shop, so it has no card sprite to name it.
+        self.assertEqual([short(s) for s in seen["opponent_team"]], [
+            (None, 1, {"damage": 1}), None, None, ("Venopuff", 1, {"poison": 4}), None, None,
+        ])
+
+
+class CardSprites(unittest.TestCase):
+    def test_every_shop_card_gives_a_sprite(self):
+        pic = _canonical("shop_day1.png")
+        if pic is None:
+            self.skipTest("captures/shop_day1.png not here")
+        state = reader.read_state(Image.open(CAPTURES / "shop_day1.png").convert("RGB"))
+        for i, card in enumerate(state["shop"]):
+            if card and card.get("name"):
+                got = reader.card_sprite(pic, i)
+                self.assertIsNotNone(got, card["name"])
+                rgb, mask = got
+                self.assertGreater(mask.mean(), 0.2, card["name"])
+
+
 if __name__ == "__main__":
     unittest.main()

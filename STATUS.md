@@ -1,10 +1,19 @@
-# Status (2026-11-12: battle simulator added; 2026-11-11: end of fourth session)
+# Status (2026-11-12: battle logging and simulator added; 2026-11-11: end of fourth session)
 
 **New on 2026-11-12: the offline battle simulator (step 3), in `sim/`.** `python -m sim --check` replays the
 two recorded battles: the Day 2 win is reproduced exactly (winner, end time, every Stats number), and the
 Day 3 loss is exact on the opponent's side (HP 124/800, their Poison and Shock, every badge) but the sim
 keeps Ed alive about 2 s too long, short by exactly his 140 of heals. What is verified and what is guessed:
 `docs\simulator.md` and `python -m sim --rules`. The simple shop rules do not use it yet.
+
+**New on 2026-11-12: every battle is logged as a simulator check.** At battle start the bot saves the frame
+to `captures\battles\` and reads both teams from it (names from sprites, levels, badges); the result box is
+saved too. The `battle` record in `logs\run_*.jsonl` now has a `seen` field with both teams. To name
+opponents' monsters the bot never owned, it saves the sprite of every shop card it sees in
+`templates\card_sprites\` (63 to start, about 30 species, cut from the saved captures). `python -m
+sim.from_logs` turns the logs into cases and prints how often the simulator picks the same winner as the
+game. Checked offline on the Day 2 battle (the read teams equal the hand-made case); **not yet run live.**
+The Stats screen and the end HP bars are still not read.
 
 The program now **starts a Casual run, plays it to the end, and stops**. Two runs were played today:
 1. The run Ed had open (Rich Lady), from Day 2 to its end on Day 8 with 3 badges.
@@ -69,8 +78,10 @@ and Stats screen numbers that match the CSV data.
 ## Next steps
 1. Run `play.py --new-run` a few more times in Casual until a whole run passes with no stop (this fills in
    the remaining glyphs). Add the main menu so it can also start from there.
-2. Read the Stats screen after each battle into the log, and log the opponent's team from the battle screen.
-   Each such battle becomes a new simulator check (a JSON file in `sim\cases\`); only two exist today.
+2. Play a few Casual runs with the new battle logging, then run `python -m sim.from_logs -v` to see where
+   the simulator disagrees with the game. Opponent monsters the bot has never seen in the shop come out
+   unnamed and those battles are skipped; they shrink as more card sprites are saved. Next readings to add:
+   the Stats screen and the HP bars on the result box.
 3. Settle the Day 3 gap (do heals count while heavily poisoned?) with a Replay of a battle where we heal
    under Poison; see `docs\simulator.md`.
 4. Read event options and trinket effects so those choices can be made on purpose.

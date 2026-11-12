@@ -554,6 +554,176 @@ def learn_sprite(name: str, slot_rgb: np.ndarray) -> Path:
     return path
 
 
+# ------------------------------------------------------------ battle screen ----
+#
+# At battle start both teams stand on the field: yours on the left facing right, the
+# opponent's on the right, mirrored. Each monster has the same "LV. n" label, sprite and
+# stat badges as on the shop screen, at the same offsets from its label, so a battle slot
+# is a box of the same size as a team slot. The bottom row is shifted 80 px towards the
+# back. Measured on captures/battle_day2.png.
+
+BATTLE_ROW_Y = (479, 719)
+
+
+def battle_slot(side: int, i: int) -> Box:
+    """Battle slot i (0-2 top row, 3-5 bottom row, column 0 = the back) of side 0 (you) or 1."""
+    col, row = i % TEAM_COLS, i // TEAM_COLS
+    if side == 0:
+        x0 = (543 if row == 0 else 463) + 240 * col
+    else:
+        x0 = (1775 if row == 0 else 1855) - 240 * col
+    y0 = BATTLE_ROW_Y[row]
+    return (x0, y0, x0 + 240, y0 + 184)
+
+
+CARD_SPRITE_DIR = ROOT / "templates" / "card_sprites"
+CARD_SPRITE_ROWS = (1186, 1290)     # the picture part of a shop card, above its badges
+CARD_SPRITES_PER_NAME = 3
+BATTLE_SPRITE_MAX = 45.0   # RMS colour difference over the sprite's own pixels
+BATTLE_SEARCH = 24         # sprites bob and sit a little differently; search this far around
+
+_battle_tpls: list[tuple[str, np.ndarray, np.ndarray]] | None = None
+
+
+def card_sprite(pic: np.ndarray, i: int) -> tuple[np.ndarray, np.ndarray] | None:
+    """The monster drawn on shop card i, as (rgb, mask). The card's coloured panel is
+    removed by flood-filling from the edges up to the sprite's dark outline."""
+    x0, _, x1, _ = shop_card(i)
+    r = pic[CARD_SPRITE_ROWS[0]:CARD_SPRITE_ROWS[1], x0 + 8:x1 - 8]
+    outline = r.max(axis=2) < 70
+    n, lab = cv2.connectedComponents((~outline).astype(np.uint8), connectivity=4)
+    edge = (set(lab[0]) | set(lab[:, 0]) | set(lab[:, -1])) - {0}
+    mask = ~(np.isin(lab, list(edge)) & ~outline)
+    n, lab, st, _ = cv2.connectedComponentsWithStats(mask.astype(np.uint8), connectivity=8)
+    if n < 2:
+        return None
+    mask = lab == 1 + int(np.argmax(st[1:, 4]))
+    ys, xs = np.nonzero(mask)
+    if len(xs) < 300:
+        return None
+    y0, y1, xa, xb = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
+    return r[y0:y1, xa:xb].copy(), mask[y0:y1, xa:xb]
+
+
+def learn_card_sprites(pic: np.ndarray, state: dict) -> list[Path]:
+    """Save the sprites of named monster cards in a shop (up to a few per name).
+
+    These let read_battle() name opponent monsters the bot has never owned.
+    """
+    saved = []
+    CARD_SPRITE_DIR.mkdir(parents=True, exist_ok=True)
+    for i, card in enumerate(state.get("shop") or []):
+        if not card or card.get("kind") != "monster" or not card.get("name"):
+            continue
+        name = card["name"]
+        have = list(CARD_SPRITE_DIR.glob(f"{name}.png")) + list(CARD_SPRITE_DIR.glob(f"{name}__*.png"))
+        if len(have) >= CARD_SPRITES_PER_NAME:
+            continue
+        cs = card_sprite(pic, i)
+        if cs is None:
+            continue
+        rgb, mask = cs
+        if any(_same_sprite(rgb, mask, p) for p in have):
+            continue
+        k = 0
+        while True:
+            path = CARD_SPRITE_DIR / (f"{name}.png" if k == 0 else f"{name}__{k}.png")
+            if not path.exists():
+                break
+            k += 1
+        rgba = np.dstack([rgb, (mask * 255).astype(np.uint8)])
+        Image.fromarray(rgba, "RGBA").save(path)
+        saved.append(path)
+    if saved:
+        global _battle_tpls
+        _battle_tpls = None
+    return saved
+
+
+def _same_sprite(rgb: np.ndarray, mask: np.ndarray, path: Path) -> bool:
+    old = np.asarray(Image.open(path).convert("RGBA"))
+    if old.shape[:2] != rgb.shape:
+        return False
+    return bool(np.abs(old[..., :3].astype(int) - rgb.astype(int))[mask].mean() < 3)
+
+
+def _battle_templates() -> list[tuple[str, np.ndarray, np.ndarray]]:
+    """(name, rgb, mask) from the team-slot sprites (white background) and the card sprites."""
+    global _battle_tpls
+    if _battle_tpls is None:
+        _battle_tpls = []
+        for name, tpl in _sprite_templates():
+            mask = np.abs(tpl.astype(int) - 255).sum(axis=2) > 60
+            if mask.sum() >= 50:
+                _battle_tpls.append((name, tpl, mask))
+        if CARD_SPRITE_DIR.exists():
+            for p in sorted(CARD_SPRITE_DIR.glob("*.png")):
+                a = np.asarray(Image.open(p).convert("RGBA"))
+                _battle_tpls.append((p.stem.split("__")[0], a[..., :3].copy(), a[..., 3] > 127))
+    return _battle_tpls
+
+
+def match_battle_sprite(pic: np.ndarray, box: Box, mirrored: bool) -> tuple[str | None, float]:
+    """Name a monster on the battle field from the saved sprites.
+
+    The field is grass, not the white slot, so only the template's own pixels are
+    compared (a masked template match). The opponent's monsters face the other way.
+    Same monster: about 0-30; a different one: 75 or more.
+    """
+    x0, y0, x1, y1 = box
+    m = BATTLE_SEARCH
+    region = pic[max(y0 - m, 0):y0 + 150, max(x0 - m, 0):x1 + m].astype(np.float32)
+    by_name: dict[str, float] = {}
+    for name, rgb, mask in _battle_templates():
+        t, k = (rgb[:, ::-1], mask[:, ::-1]) if mirrored else (rgb, mask)
+        if t.shape[0] > region.shape[0] or t.shape[1] > region.shape[1]:
+            continue
+        m3 = np.repeat(k[..., None], 3, axis=2).astype(np.float32)
+        res = cv2.matchTemplate(region, np.ascontiguousarray(t, dtype=np.float32), cv2.TM_SQDIFF, mask=m3)
+        d = float(np.sqrt(max(res.min(), 0.0) / m3.sum()))
+        by_name[name] = min(d, by_name.get(name, 1e9))
+    if not by_name:
+        return None, 1e9
+    ranked = sorted(by_name.items(), key=lambda kv: kv[1])
+    best, best_d = ranked[0]
+    if best_d > BATTLE_SPRITE_MAX or (len(ranked) > 1 and best_d * 2 > ranked[1][1]):
+        return None, best_d
+    return best, best_d
+
+
+def _read_battle_slot(pic: np.ndarray, side: int, i: int, problems: list[str]) -> dict | None:
+    box = battle_slot(side, i)
+    rgb = crop(pic, box)
+    fill = level_mask(rgb)
+    if fill.sum() < 20:
+        return None                       # no "LV." label: empty slot
+    where = f"{'my' if side == 0 else 'opponent'} slot {i}"
+    parts = glyphs.segment(fill)
+    level_text = store().classify("level", parts[-1].bitmap)[0] if len(parts) >= 3 else ""
+    level = _to_int(level_text)
+    if level is None:
+        problems.append(f"{where}: cannot read level ('{level_text}')")
+    badges = read_stat_badges(pic, owned_badge_band(box))
+    if any(b["value"] is None for b in badges):
+        problems.append(f"{where}: cannot read a stat badge")
+    name, dist = match_battle_sprite(pic, box, mirrored=side == 1)
+    return {"name": name, "level": level, "stats": badges,
+            "sprite_distance": round(dist, 1) if dist < 1e8 else None}
+
+
+def read_battle(pic: np.ndarray) -> dict:
+    """Both teams on the battle screen. Read it at the start, before badges change.
+
+    Monster names come from the sprites the bot has saved; an unknown monster has name
+    None (its level, badges and slot are still read). Unknown names are not problems:
+    the battle can go on, and the capture is kept so the name can be taught later.
+    """
+    problems: list[str] = []
+    teams = [[_read_battle_slot(pic, side, i, problems) for i in range(TEAM_COLS * TEAM_ROWS)]
+             for side in (0, 1)]
+    return {"my_team": teams[0], "opponent_team": teams[1], "problems": problems}
+
+
 # ------------------------------------------------------------ slot reads ----
 
 def owned_badge_band(box: Box) -> Box:
@@ -704,6 +874,8 @@ def read_state(image: Image.Image) -> dict:
     if state["screen"] == "shop":
         state.update(read_shop(pic))
     elif state["screen"] in ("result", "stats", "matchmaking", "blank", "battle", "run_over"):
+        # recognised. The battle field is read with read_battle() only on request: it takes
+        # a few seconds, too slow for every frame while waiting.
         state["problems"] = []            # recognised; nothing on them is read yet
     elif state["screen"] == "gift_box":
         state["problems"] = []
