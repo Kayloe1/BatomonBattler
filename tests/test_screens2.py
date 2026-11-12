@@ -95,5 +95,21 @@ class NewScreens(unittest.TestCase):
             self.assertNotIn(state(name)["screen"], ("main_menu", "cash_in"))
 
 
+
+
+class ShopAfterReroll(unittest.TestCase):
+    """The day 10 shop the bot stopped on: '$40' and 'Onsetra' (capital O is the glyph of zero)."""
+
+    def test_reads_cleanly(self):
+        state = reader.read_state(Image.open(CAP / "shop_day10_reroll.png"))
+        self.assertEqual(state["problems"], [])
+        self.assertEqual([(c["name"], c["price"]) for c in state["shop"]],
+                         [("Humbolt", 25), ("Fumungus", 40), ("Aristobat", 25), ("Onsetra", 50), ("Basic Candy", 30)])
+        self.assertEqual((state["day"], state["money"]), (10, 97))
+
+    def test_capital_o_is_zero(self):
+        self.assertEqual(reader.resolve("0nsetra", reader.MONSTER_NAMES), "Onsetra")
+
+
 if __name__ == "__main__":
     unittest.main()

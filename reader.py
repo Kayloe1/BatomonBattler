@@ -315,8 +315,8 @@ def resolve(text: str, candidates: list[str], ignore_case: bool = False) -> str 
     """
     if not text:
         return None
-    # capital I and lowercase l are the same glyph in the card font
-    key = (lambda s: s.upper()) if ignore_case else (lambda s: s.replace("I", "l"))
+    # capital I and lowercase l are the same glyph in the card font, and so are capital O and zero
+    key = (lambda s: s.upper()) if ignore_case else (lambda s: s.replace("I", "l").replace("O", "0"))
     t = key(text)
     hits = []
     for cand in candidates:
