@@ -54,6 +54,19 @@ def choose_purchase(state: dict) -> int | None:
     return -neg_i
 
 
+def learn_sprites(h, state: dict) -> None:
+    """Save the shop cards' sprites so opponents' monsters can be named on the battle screen."""
+    if getattr(h, "last_image", None) is None:
+        return
+    try:
+        import numpy as np
+        import reader
+        import window
+        reader.learn_card_sprites(np.asarray(window.canonical_picture(h.last_image)), state)
+    except Exception as e:      # never stop a run over this
+        print("card sprites not saved:", e)
+
+
 def act(h, a):
     """Carry out one engine action with the hands."""
     if a.kind == "buy":
@@ -119,6 +132,7 @@ def main() -> int:
                 print(f"day {last_shop['day']}: badges {outcome['badges']:+d}, lives {outcome['lives']:+d}")
                 last_shop = None
             log("shop", state=state)
+            learn_sprites(h, state)
             if brain is None:
                 i = choose_purchase(state)
                 if i is not None:
@@ -161,7 +175,8 @@ def main() -> int:
             r = h.battle()
             battles += 1
             print(f"day {state['day']}: battle -> {r.message}")
-            log("battle", team=state["team"], ok=r.ok, message=r.message)
+            log("battle", team=state["team"], ok=r.ok, message=r.message, day=state["day"],
+                trainer=state["trainer"], trainer_hp=state["trainer_hp"], seen=r.battle)
             if not r.ok:
                 return stop(f"battle did not reach the result box: {r.message} "
                             f"(capture: {(r.after or {}).get('saved_capture')})", r.after)

@@ -114,9 +114,15 @@ settle it: after a battle where we heal while poisoned, open **Replay** and read
 seconds, or read the opponent's Stats tab (the bot does not read the Stats screen yet). Once known, change
 the rule in `sim/battle.py` and move the case's `known_gaps` entry to a passing check.
 
-## Why only two battles
+## Checking against logged battles
 
-The bot's logs record our own team but not the opponent's team, and the older repo's 105 logged fights
-have Stats numbers but no team names on either side, so neither can be replayed. Logging the opponent's
-team (from the battle screen at start) and the Stats screen after every battle would turn each Casual
-battle into a new test case: add it as a JSON file in `sim/cases/`.
+Since 2026-11-12 the bot reads both teams from the battle screen at the start of every battle and logs them
+(`seen` in the `battle` record of `logs/run_*.jsonl`); the next shop gives the result (badge = win, life =
+loss). `python -m sim.from_logs` replays every logged battle and prints how often the simulator picks the
+same winner (`-v` lists each battle, `--save` writes them to `sim/cases/logged/`). The opponent's trinkets
+and trainer bonuses are not visible, so they are left out, and their HP is the day's HP from the table.
+A battle is skipped when a monster could not be named (one the bot has never seen in the shop) or day 9+
+HP is not known. An unnamed level-1 monster with only a 1 damage badge is taken to be the Dragon Egg (guess).
+
+Winner agreement is a coarse check. The exact numbers (end time, Dealt, Healed) need the Stats screen,
+which is not read yet.

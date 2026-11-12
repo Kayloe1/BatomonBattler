@@ -1,0 +1,157 @@
+"""Turn the bot's run logs into simulator test cases and check how often the simulator agrees.
+
+    python -m sim.from_logs                     # every logs/run_*.jsonl
+    python -m sim.from_logs logs/run_x.jsonl -v # one log, one line per battle
+    python -m sim.from_logs --save              # also write each battle to sim/cases/logged/
+
+play.py writes a "battle" record after each battle with both teams as read from the battle screen
+("seen"), and a "day_result" record on the next shop screen (badges +1 = won, lives -1 = lost).
+Trinkets come from the "trinket" picks earlier in the same run. The opponent's trinkets and trainer
+are not visible, so the opponent gets none and the day's HP from sim.data.DAY_HP.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+from . import data
+from .battle import simulate
+
+ROOT = Path(__file__).resolve().parent.parent
+LOG_DIR = ROOT / "logs"
+SAVE_DIR = Path(__file__).resolve().parent / "cases" / "logged"
+
+
+def _slot(s: dict | None) -> dict | None:
+    if not s:
+        return None
+    stats, mc = {}, None
+    for b in s.get("stats", []):
+        if b.get("stat") == "multicast":
+            mc = b.get("value")
+        elif b.get("stat") in data.STATS and b.get("value") is not None:
+            stats[b["stat"]] = b["value"]
+    name = s.get("name")
+    # GUESS: an unnamed level-1 monster whose only badge is 1 damage is the Dragon Egg (an event
+    # reward, never in the shop, so there is no card sprite to name it).
+    if name is None and (s.get("level") or 1) == 1 and stats == {"damage": 1}:
+        name = "Dragon Egg"
+    out = {"name": name, "level": s.get("level") or 1, "stats": stats}
+    if mc:
+        out["multicast"] = mc
+    return out
+
+
+def battles_from_log(path: Path) -> list[dict]:
+    """One case per logged battle: {"a", "b", "day", "result", "problems", "source"}."""
+    records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    trinkets: list[str] = []
+    cases: list[dict] = []
+    open_case: dict | None = None
+    for rec in records:
+        kind = rec.get("kind")
+        if kind == "new_run" or kind == "trainer":
+            trinkets = []
+        elif kind == "trinket" and rec.get("ok"):
+            offered, k = rec.get("offered") or [], rec.get("picked")
+            if isinstance(k, int) and k < len(offered) and offered[k]:
+                trinkets.append(offered[k])
+        elif kind == "battle":
+            seen = rec.get("seen") or {}
+            problems = list(seen.get("problems", []))
+            mine = [_slot(s) for s in seen.get("my_team", [])] or [None] * 6
+            theirs = [_slot(s) for s in seen.get("opponent_team", [])] or [None] * 6
+            if not seen:
+                problems.append("battle screen not read")
+            for side, team in (("my", mine), ("opponent", theirs)):
+                for i, s in enumerate(team):
+                    if s and not s["name"]:
+                        problems.append(f"{side} slot {i + 1} not named")
+            day = rec.get("day")
+            hp_them = data.DAY_HP.get(day)
+            if hp_them is None:
+                problems.append(f"no HP known for day {day}")
+            open_case = {
+                "source": f"{path.name} {rec.get('time')}",
+                "day": day,
+                "a": {"trainer": rec.get("trainer"), "hp": rec.get("trainer_hp") or data.DAY_HP.get(day),
+                      "trinkets": list(trinkets), "slots": mine},
+                "b": {"hp": hp_them, "trinkets": [], "slots": theirs},
+                "result": None,
+                "problems": problems,
+                "captures": [seen.get("start_capture"), seen.get("result_capture")],
+            }
+            cases.append(open_case)
+        elif kind == "day_result" and open_case is not None:
+            if rec.get("badges", 0) > 0:
+                open_case["result"] = "win"
+            elif rec.get("lives", 0) < 0:
+                open_case["result"] = "loss"
+            else:
+                open_case["result"] = "draw"     # GUESS: neither a badge nor a life changed hands
+            open_case = None
+        elif kind == "run_over" and open_case is not None and open_case["result"] is None:
+            open_case["result"] = "loss"         # the run ends on the last lost life
+            open_case = None
+    return cases
+
+
+def check(cases: list[dict], seeds: int = 5) -> dict:
+    """Simulate each usable case; a case agrees when the most common winner over the seeds matches."""
+    word = {"a": "win", "b": "loss", "draw": "draw"}
+    out = {"usable": 0, "agree": 0, "skipped": 0, "rows": []}
+    for c in cases:
+        if c["problems"] or c["result"] is None:
+            out["skipped"] += 1
+            out["rows"].append((c, None, "skipped: " + ("; ".join(c["problems"]) or "no result logged")))
+            continue
+        try:
+            wins: dict[str, int] = {}
+            for seed in range(seeds):
+                r = simulate(c["a"], c["b"], seed=seed)
+                wins[r.winner] = wins.get(r.winner, 0) + 1
+        except Exception as e:  # an unknown name or a bad slot: report, do not stop
+            out["skipped"] += 1
+            out["rows"].append((c, None, f"skipped: {type(e).__name__}: {e}"))
+            continue
+        sim = word[max(wins, key=wins.get)]
+        out["usable"] += 1
+        out["agree"] += sim == c["result"]
+        out["rows"].append((c, sim, "agree" if sim == c["result"] else "DISAGREE"))
+    return out
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("logs", nargs="*", type=Path)
+    ap.add_argument("-v", "--verbose", action="store_true")
+    ap.add_argument("--save", action="store_true", help=f"write each usable battle to {SAVE_DIR}")
+    args = ap.parse_args(argv)
+    paths = args.logs or sorted(LOG_DIR.glob("run_*.jsonl"))
+    if not paths:
+        print(f"no logs in {LOG_DIR}")
+        return 1
+    cases = [c for p in paths for c in battles_from_log(p)]
+    res = check(cases)
+    for c, sim, verdict in res["rows"]:
+        if args.verbose or verdict == "DISAGREE":
+            print(f"{c['source']} day {c['day']}: game {c['result']}, sim {sim}: {verdict}")
+    if args.save:
+        SAVE_DIR.mkdir(parents=True, exist_ok=True)
+        for c, sim, _ in res["rows"]:
+            if sim is not None:
+                name = c["source"].replace(" ", "_").replace(":", "").replace(".jsonl", "")
+                (SAVE_DIR / f"{name}.json").write_text(json.dumps(
+                    {"source": c["source"], "a": c["a"], "b": c["b"], "expect": {"result": c["result"]}},
+                    indent=1), encoding="utf-8")
+    n = res["usable"]
+    pct = f"{100 * res['agree'] / n:.0f}%" if n else "-"
+    print(f"{len(cases)} battles logged, {n} usable, simulator agrees on {res['agree']} ({pct}), "
+          f"{res['skipped']} skipped")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
