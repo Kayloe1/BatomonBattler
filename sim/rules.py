@@ -25,6 +25,9 @@ SETTINGS = {
     "heal_cap": True,
     # At equal times the player's side acts first, then the opponent's.
     "player_first_on_ties": True,
+    # Shortest effective cooldown after Cooldown Speed. Without a floor, stacking speed (Galvanine Lv4
+    # gains +50% per cast) makes casts come faster without end and the battle never finishes.
+    "min_cooldown": 0.25,
     # Longest battle before it is called a draw.
     "time_limit": 300.0,
     # Stop chains of triggers that trigger each other.
@@ -37,6 +40,8 @@ RULES = [
      "verified", "Day 2 and Day 3 battles: every cast count on both Stats screens matches."),
     ("Cooldown Speed +X% divides the cooldown by (1 + X/100); bonuses add up.",
      "old-notes", "'Increases how frequently you trigger by lowering cooldown.' The exact formula is a guess."),
+    ("Cooldown Speed cannot bring a cooldown below 0.25 s.",
+     "guess", "Not seen in the game; it keeps self-accelerating teams (Galvanine) from looping without end."),
     ("Charge N s moves the cooldown timer forward by N s; a full timer casts at once.",
      "old-notes", "'Progresses cooldown timer.'"),
     ("Several events at the same instant: casts first (player's side, slots 1-6, then the opponent's), then Burn and Poison ticks.",
