@@ -119,6 +119,14 @@ SCREENS: dict[str, list[tuple[int, int, tuple[int, int, int]]]] = {
     # The rows are different in the two menus, so neither can be taken for the other.
     "main_menu": [(900, 772, RED), (900, 924, RED), (900, 1076, RED), (900, 1228, RED),
                   (25, 1118, (21, 157, 216)), (25, 1238, (21, 157, 216))],
+    # After Continue on the main menu: a panel with the saved run (mode, day, lives, badges, team) and
+    # Cancel / Confirm. The hamburger button top right is greyed out while it shows.
+    "continue_confirm": [(600, 1215, RED), (1900, 1215, RED), (850, 900, (231, 231, 231)), (1250, 850, (255, 255, 255)),
+                         (2480, 110, (123, 123, 123)), (25, 1118, (21, 157, 216)), (25, 1238, (21, 157, 216))],
+    # "Select a target": an event effect needs a monster. BENCH and MY TEAM panels sit in the middle,
+    # Confirm (grey until a monster is clicked) and Back below them.
+    "select_target": [(1500, 410, (255, 189, 8)), (1500, 760, PINK), (1350, 1330, RED), (1700, 1330, RED),
+                      (400, 210, (255, 189, 8))],
     # Title screen: the logo, the dragon silhouette and the dark "PRESS ANY KEY TO START" label
     "title": [(768, 240, (237, 103, 250)), (1408, 240, (67, 249, 245)), (1280, 739, (111, 49, 71)),
               (890, 1045, (55, 55, 55)), (1650, 1045, (55, 55, 55))],
@@ -138,6 +146,66 @@ def fast_forward_on(pic: np.ndarray) -> bool:
 
 # Buttons on the other screens
 RESULT_CONFIRM: Box = BATTLE_BUTTON
+TARGET_CONFIRM: Box = (850, 1290, 1225, 1385)
+TARGET_BACK: Box = (1335, 1290, 1715, 1385)
+
+
+def target_team_slot(i: int) -> Box:
+    """Team slot i on the "Select a target" screen (same order as the shop: 0-2 top row, 3-5 bottom)."""
+    col, row = i % TEAM_COLS, i // TEAM_COLS
+    return (868 + 288 * col, 812 + 232 * row, 1108 + 288 * col, 996 + 232 * row)
+
+
+def target_bench_slot(i: int) -> Box:
+    return (708 + 288 * i, 456, 948 + 288 * i, 640)
+
+
+def read_select_target(pic: np.ndarray) -> dict:
+    """Team and bench on the "Select a target" screen, and whether Confirm can be pressed yet."""
+    problems: list[str] = []
+    team = [_read_owned_slot(pic, target_team_slot(i), f"target team {i}", problems)
+            for i in range(TEAM_COLS * TEAM_ROWS)]
+    bench = [_read_owned_slot(pic, target_bench_slot(i), f"target bench {i}", problems) for i in range(BENCH_SLOTS)]
+    x0, y0, x1, y1 = TARGET_CONFIRM
+    enabled = bool(_near(pic[y0:y1, x0:x1], RED, 40).mean() > 0.5)
+    # badge reading problems here are not fatal: a slot can still be clicked
+    return {"team": team, "bench": bench, "confirm_enabled": enabled, "problems": [], "notes": problems}
+
+
+CONTINUE_CONFIRM: Box = (1300, 1160, 1955, 1265)
+CONTINUE_CANCEL: Box = (590, 1160, 1245, 1265)
+CONTINUE_MODE_LABEL: Box = (580, 600, 1000, 680)      # "CASUAL MODE", top left of the panel
+CONTINUE_MODE_GREY = (126, 126, 126)
+CASUAL_LABEL_FILE = ROOT / "templates" / "continue_casual_mode.png"
+
+
+def continue_mode_mask(pic: np.ndarray) -> np.ndarray | None:
+    """The mode label of the continue panel as a trimmed text mask (None if nothing is there)."""
+    m = _near(crop(pic, CONTINUE_MODE_LABEL), CONTINUE_MODE_GREY, 10)
+    ys, xs = np.nonzero(m)
+    if len(ys) < 50:
+        return None
+    return m[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+
+
+def continue_mode(pic: np.ndarray) -> str | None:
+    """"casual" only when the label is, pixel for pixel, the saved "CASUAL MODE" label; else None.
+
+    Anything else (a Ranked label, a label never seen, a shifted picture) is None, and the bot
+    then refuses to press Confirm. There is deliberately no way for this to return "ranked".
+    """
+    m = continue_mode_mask(pic)
+    if m is None or not CASUAL_LABEL_FILE.exists():
+        return None
+    tpl = np.asarray(Image.open(CASUAL_LABEL_FILE).convert("L")) > 127
+    if abs(m.shape[0] - tpl.shape[0]) > 1 or abs(m.shape[1] - tpl.shape[1]) > 1:
+        return None
+    h, w = min(m.shape[0], tpl.shape[0]), min(m.shape[1], tpl.shape[1])
+    a, b = m[:h, :w], tpl[:h, :w]
+    iou = np.logical_and(a, b).sum() / max(np.logical_or(a, b).sum(), 1)
+    return "casual" if iou >= 0.97 else None
+
+
 TITLE_ANYWHERE: Box = (1180, 1300, 1380, 1400)     # empty sky under the label
 MAIN_MENU_NEW_RUN: Box = (845, 730, 1715, 815)        # only on the four-button menu
 MAIN_MENU_CONTINUE: Box = (845, 654, 1715, 738)       # only on the five-button menu
@@ -247,8 +315,8 @@ def resolve(text: str, candidates: list[str], ignore_case: bool = False) -> str 
     """
     if not text:
         return None
-    # capital I and lowercase l are the same glyph in the card font
-    key = (lambda s: s.upper()) if ignore_case else (lambda s: s.replace("I", "l"))
+    # capital I and lowercase l are the same glyph in the card font, and so are capital O and zero
+    key = (lambda s: s.upper()) if ignore_case else (lambda s: s.replace("I", "l").replace("O", "0"))
     t = key(text)
     hits = []
     for cand in candidates:
@@ -258,6 +326,33 @@ def resolve(text: str, candidates: list[str], ignore_case: bool = False) -> str 
     known = sum(ch != glyphs.UNKNOWN and ch != " " for ch in t)
     if len(hits) == 1 and known * 2 >= len(t.replace(" ", "")):
         return hits[0]
+    return None
+
+
+def fill_number(text: str, expected: int | None) -> int | None:
+    """A number read with unknown digits ("24?00"), completed from the value the game data expects.
+
+    Only when the length fits, every digit that was read agrees, and at least half were read.
+    The reader still never invents a value: the expected one must match what is on screen.
+    """
+    if expected is None or glyphs.UNKNOWN not in text:
+        return None
+    e = str(expected)
+    known = sum(ch != glyphs.UNKNOWN for ch in text)
+    if len(e) == len(text) and known * 2 >= len(text) and all(a == b or a == glyphs.UNKNOWN for a, b in zip(text, e)):
+        return expected
+    return None
+
+
+def _list_cost(name: str | None, kind: str | None) -> int | None:
+    try:
+        from engine import data
+        if kind == "monster":
+            return data.roster()[name].cost
+        if kind == "item":
+            return data.items()[name]["cost"]
+    except Exception:
+        pass
     return None
 
 
@@ -1026,7 +1121,8 @@ def _read_owned_slot(pic: np.ndarray, box: Box, where: str, problems: list[str])
     return {"name": name, "level": level, "stats": badges, "sprite_distance": round(dist, 1) if dist < 1e8 else None}
 
 
-def _read_shop_slot(pic: np.ndarray, i: int, masks: dict, problems: list[str]) -> dict | None:
+def _read_shop_slot(pic: np.ndarray, i: int, masks: dict, problems: list[str],
+                    notes: list[str] | None = None) -> dict | None:
     font, mask, _ = masks[f"shop{i}"]
     text_rgb = crop(pic, _card_text(i))
     if _near(text_rgb, SOLD_GREY, 6).mean() > 0.8:
@@ -1049,6 +1145,10 @@ def _read_shop_slot(pic: np.ndarray, i: int, masks: dict, problems: list[str]) -
         if name:
             kind = "item"
     price = _to_int(raw_price[1:]) if raw_price.startswith("$") else None
+    if price is None and raw_price.startswith("$"):
+        price = fill_number(raw_price[1:], _list_cost(name, kind))
+        if price is not None and notes is not None:
+            notes.append(f"shop {i}: price '{raw_price}' completed to ${price}, the list price of {name}")
     if name is None:
         problems.append(f"shop {i}: unknown name '{raw_name}'")
     if price is None:
@@ -1067,6 +1167,7 @@ def _read_shop_slot(pic: np.ndarray, i: int, masks: dict, problems: list[str]) -
 
 def read_shop(pic: np.ndarray) -> dict:
     problems: list[str] = []
+    notes: list[str] = []     # values completed from the game data; not a reason to stop
     masks = text_masks(pic)
     st = store()
 
@@ -1097,8 +1198,16 @@ def read_shop(pic: np.ndarray) -> dict:
     if state["trainer"] is None:
         problems.append(f"trainer: unknown name '{t}'")
 
-    state["trainer_hp"] = number("hp")
     state["money"] = number("money", "$")
+    hp_text = text("hp")
+    state["trainer_hp"] = _to_int(hp_text)
+    if state["trainer_hp"] is None and state["day"] is not None:
+        from engine import data
+        state["trainer_hp"] = fill_number(hp_text, data.hp_for_day(state["day"]))
+        if state["trainer_hp"] is not None:
+            notes.append(f"hp: '{hp_text}' completed to {state['trainer_hp']}, the HP of day {state['day']}")
+    if state["trainer_hp"] is None:
+        problems.append(f"hp: cannot read '{hp_text}'")
 
     # "Rank 4 *67% *30% *3% *0% *0%"   (* = the rarity gem)
     r = text("rank_bar")
@@ -1123,12 +1232,13 @@ def read_shop(pic: np.ndarray) -> dict:
     if state["locked"] is None:
         problems.append(f"lock button: unknown look (label {width} px wide)")
 
-    state["shop"] = [_read_shop_slot(pic, i, masks, problems) for i in range(SHOP_SLOTS)]
+    state["shop"] = [_read_shop_slot(pic, i, masks, problems, notes) for i in range(SHOP_SLOTS)]
     state["team"] = [_read_owned_slot(pic, team_slot(i), f"team {i}", problems)
                      for i in range(TEAM_COLS * TEAM_ROWS)]
     state["bench"] = [_read_owned_slot(pic, bench_slot(i), f"bench {i}", problems)
                       for i in range(BENCH_SLOTS)]
     state["problems"] = problems
+    state["notes"] = notes
     return state
 
 
@@ -1142,6 +1252,11 @@ def read_state(image: Image.Image) -> dict:
         # recognised. The battle field is read with read_battle() only on request: it takes
         # a few seconds, too slow for every frame while waiting.
         state["problems"] = []            # recognised; nothing on them is read yet
+    elif state["screen"] == "continue_confirm":
+        state["mode"] = continue_mode(pic)
+        state["problems"] = []            # an unreadable mode is not a reading error: hands refuses to confirm
+    elif state["screen"] == "select_target":
+        state.update(read_select_target(pic))
     elif state["screen"] == "gift_box":
         state["problems"] = []
     elif state["screen"] == "trinket_pick":
@@ -1166,6 +1281,8 @@ def comparable(state: dict) -> dict:
     """A state without the fields that change from frame to frame (for tests and expected files)."""
     state = json.loads(json.dumps(state))
     state.pop("saved_capture", None)
+    if not state.get("notes"):
+        state.pop("notes", None)          # expected files written before notes existed
     for slot in state.get("team", []) + state.get("bench", []):
         if slot:
             slot.pop("sprite_distance", None)

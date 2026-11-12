@@ -80,5 +80,22 @@ class Brain:
         s = self.run_state(shop_state) if shop_state else model.RunState()
         return events.pick(self.planner, s, effects)
 
+    def event_target(self, shop_state: dict | None, effect: str | None, screen_state: dict):
+        """Which monster to click on "Select a target": ((where, i) or None, explanation)."""
+        s = self.run_state(shop_state) if shop_state else model.RunState()
+        unit, why = events.best_target(self.planner, s, effect)
+        pos = events.find_on_screen(unit, screen_state)
+        if pos is not None:
+            return pos, f"{unit.name or 'this monster'}: {why}"
+        # not found (the team changed since the last shop): the biggest damage badge on screen
+        best, score = None, -1
+        for where in ("team", "bench"):
+            for i, slot in enumerate(screen_state.get(where) or []):
+                if slot:
+                    dmg = max([b.get("value") or 0 for b in slot.get("stats", []) if b.get("stat") == "damage"] or [0])
+                    if dmg > score:
+                        best, score = (where, i), dmg
+        return best, "I could not match my planned target on this screen, so I take the monster with the most damage"
+
     def trainer(self, offered: list[str | None]) -> tuple[int, str]:
         return choices.pick_trainer(offered)

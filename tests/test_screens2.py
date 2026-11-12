@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+import glyphs
 import reader
 import window
 
@@ -29,6 +30,41 @@ class NewScreens(unittest.TestCase):
         x0, y0, x1, y1 = reader.MAIN_MENU_CONTINUE
         self.assertGreater(reader._near(pic[y0:y1, x0:x1], (239, 66, 107), 40).mean(), 0.5)
         self.assertLess(y1, 796)            # the Continue box ends above the New Run button (starts at y 796)
+
+    def test_continue_panel_reads_casual(self):
+        st = state("continue_confirm_casual.png")
+        self.assertEqual(st["screen"], "continue_confirm")
+        self.assertEqual(st["mode"], "casual")
+
+    def test_continue_panel_refuses_any_other_label(self):
+        pic = np.asarray(window.canonical_picture(Image.open(CAP / "continue_confirm_casual.png"))).copy()
+        x0, y0, x1, y1 = reader.CONTINUE_MODE_LABEL
+        label = pic[y0:y1, x0:x1].copy()
+        # a longer label (as "RANKED MODE" or anything unseen would be): not casual
+        pic[y0:y1, x0 + 60:x1] = label[:, :-60]
+        self.assertIsNone(reader.continue_mode(pic))
+        # no label at all: not casual
+        pic[y0:y1, x0:x1] = 255
+        self.assertIsNone(reader.continue_mode(pic))
+
+    def test_continue_buttons(self):
+        pic = np.asarray(window.canonical_picture(Image.open(CAP / "continue_confirm_casual.png")))
+        for box in (reader.CONTINUE_CONFIRM, reader.CONTINUE_CANCEL):
+            x0, y0, x1, y1 = box
+            self.assertGreater(reader._near(pic[y0:y1, x0:x1], (239, 66, 107), 40).mean(), 0.5)
+        self.assertGreater(reader.CONTINUE_CONFIRM[0], reader.CONTINUE_CANCEL[2])
+
+    def test_select_target_screen(self):
+        st = state("select_target.png")
+        self.assertEqual(st["screen"], "select_target")
+        self.assertFalse(st["confirm_enabled"])
+        self.assertIsNone(st["team"][0])
+        self.assertEqual([b["value"] for b in st["team"][1]["stats"]], [150])
+        self.assertEqual(st["bench"], [None] * 4)
+        pic = np.asarray(window.canonical_picture(Image.open(CAP / "select_target.png")))
+        x0, y0, x1, y1 = reader.TARGET_BACK
+        self.assertGreater(reader._near(pic[y0:y1, x0:x1], (239, 66, 107), 40).mean(), 0.5)
+        self.assertLess(reader.TARGET_CONFIRM[2], reader.TARGET_BACK[0])     # Confirm never overlaps Back
 
     def test_title(self):
         self.assertEqual(state("title_screen.png")["screen"], "title")
@@ -58,6 +94,65 @@ class NewScreens(unittest.TestCase):
     def test_other_screens_not_mistaken(self):
         for name in ("stats_day2.png", "result_loss_day3.png"):
             self.assertNotIn(state(name)["screen"], ("main_menu", "cash_in"))
+
+
+
+
+class ShopAfterReroll(unittest.TestCase):
+    """The day 10 shop the bot stopped on: '$40' and 'Onsetra' (capital O is the glyph of zero)."""
+
+    def test_reads_cleanly(self):
+        state = reader.read_state(Image.open(CAP / "shop_day10_reroll.png"))
+        self.assertEqual(state["problems"], [])
+        self.assertEqual([(c["name"], c["price"]) for c in state["shop"]],
+                         [("Humbolt", 25), ("Fumungus", 40), ("Aristobat", 25), ("Onsetra", 50), ("Basic Candy", 30)])
+        self.assertEqual((state["day"], state["money"]), (10, 97))
+
+    def test_capital_o_is_zero(self):
+        self.assertEqual(reader.resolve("0nsetra", reader.MONSTER_NAMES), "Onsetra")
+
+
+class CompletedNumbers(unittest.TestCase):
+    """A number with an unknown digit is completed only when the game data agrees with what was read."""
+
+    def test_fill_number(self):
+        self.assertEqual(reader.fill_number("24?00", 24900), 24900)
+        self.assertIsNone(reader.fill_number("24?00", 34700))      # a read digit disagrees
+        self.assertIsNone(reader.fill_number("24?0", 24900))       # wrong length
+        self.assertIsNone(reader.fill_number("???00", 24900))      # too little was read
+        self.assertIsNone(reader.fill_number("24900", 24900))      # nothing unknown: not this function's job
+
+    def test_day11_shop(self):
+        state = reader.read_state(Image.open(CAP / "shop_day11_hp.png"))
+        self.assertEqual(state["problems"], [])
+        self.assertEqual((state["day"], state["trainer_hp"], state["money"]), (11, 24900, 87))
+        self.assertEqual([(c["name"], c["price"]) for c in state["shop"]],
+                         [("Geminiss", 50), ("Electranade", 25), ("Aristobat", 25), ("Sirenade", 40), ("Voucher", 5)])
+
+    def test_unknown_hp_digit_is_completed_from_the_day(self):
+        old = reader._store
+        try:
+            st = glyphs.GlyphStore()
+            st.fonts["hp"] = [e for e in st.fonts["hp"] if e[0] != "9"]
+            reader._store = st
+            state = reader.read_state(Image.open(CAP / "shop_day11_hp.png"))
+        finally:
+            reader._store = old
+        self.assertEqual(state["problems"], [])
+        self.assertEqual(state["trainer_hp"], 24900)
+        self.assertEqual(len(state["notes"]), 1)
+
+    def test_unknown_price_digit_is_completed_from_the_list_price(self):
+        old = reader._store
+        try:
+            st = glyphs.GlyphStore()
+            st.fonts["card"] = [e for e in st.fonts["card"] if e[0] != "4"]
+            reader._store = st
+            state = reader.read_state(Image.open(CAP / "shop_day11_hp.png"))
+        finally:
+            reader._store = old
+        self.assertEqual(state["problems"], [])
+        self.assertEqual(state["shop"][3]["price"], 40)
 
 
 if __name__ == "__main__":

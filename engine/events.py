@@ -79,7 +79,8 @@ def _level_up(u):
     return model.replace(u.with_stats(d), level=u.level + 1)
 
 
-def _best_single_change(planner: Planner, s: RunState, change) -> tuple[float, str | None]:
+def _best_single_change_unit(planner: Planner, s: RunState, change):
+    """(gain, unit) of the owned monster that gains most from change(unit); (0.0, None) if none does."""
     best, who = 0.0, None
     for w, k, u in s.owned():
         v = change(u)
@@ -89,8 +90,68 @@ def _best_single_change(planner: Planner, s: RunState, change) -> tuple[float, s
         t.set_slot(w, k, v)
         g = _team_gain(planner, s, t)
         if g > best:
-            best, who = g, u.name
+            best, who = g, u
     return best, who
+
+
+def _best_single_change(planner: Planner, s: RunState, change) -> tuple[float, str | None]:
+    g, u = _best_single_change_unit(planner, s, change)
+    return g, (u.name if u else None)
+
+
+def _shock(n: int):
+    def change(u):
+        d = u.stat_dict()
+        d["shock"] += n
+        return u.with_stats(d)
+    return change
+
+
+def best_target(planner: Planner, s: RunState, effect: str | None):
+    """The owned monster an event effect should be put on, with the reason: (Unit or None, why).
+
+    Level-ups and +Shock go where the simulator gains most. For effects it cannot model (shiny...)
+    the strongest monster is taken: the September lessons say to put such boosts on the carry.
+    """
+    from .arrange import power
+    effect = effect or ""
+    unit = None
+    if _has(effect, "Level up a monster"):
+        _, unit = _best_single_change_unit(planner, s, _level_up)
+        why = "levelling it improves the simulated battles most"
+    else:
+        m = re.search(r"\+(\d+) Shock", effect)
+        if m:
+            _, unit = _best_single_change_unit(planner, s, _shock(int(m.group(1))))
+            why = f"+{m.group(1)} Shock helps it most in the simulator"
+    if unit is None:
+        owned = [u for _, _, u in s.owned()]
+        unit = max(owned, key=power, default=None)
+        why = "it is my strongest monster, and boosts belong on the carry"
+    return unit, why
+
+
+def unit_signature(level, stats: dict) -> tuple:
+    """What identifies a monster on a screen where its name may not be readable."""
+    return (level or 1, tuple(sorted((k, int(v)) for k, v in stats.items() if v and k != "multicast")))
+
+
+def find_on_screen(unit, state: dict) -> tuple[str, int] | None:
+    """Where the unit sits on the "Select a target" screen: same name if readable, same level and badges."""
+    if unit is None:
+        return None
+    want = unit_signature(unit.level, unit.stat_dict())
+    fallback = None
+    for where in ("team", "bench"):
+        for i, slot in enumerate(state.get(where) or []):
+            if not slot:
+                continue
+            got = unit_signature(slot.get("level"), {b.get("stat"): b.get("value") or 0 for b in slot.get("stats", [])})
+            if got == want:
+                if slot.get("name") in (None, unit.name):
+                    return (where, i)
+                fallback = fallback or (where, i)
+    return fallback
 
 
 def score_effect(planner: Planner, s: RunState, effect: str) -> tuple[float, str, bool]:

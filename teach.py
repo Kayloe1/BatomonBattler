@@ -184,6 +184,14 @@ LESSONS = [
         "file": "captures/shop_chef_day10.png",
         "text": {"day": "DAY10"},
     },
+    {   # day 10 shop after a free reroll: capital H, a new shape of "4"; capital O is the glyph of zero
+        "file": "captures/shop_day10_reroll.png",
+        "text": {"shop0": "Humbolt|$25", "shop1": "Fumungus|$40"},
+    },
+    {   # day 11: the first "9" in the HP bar
+        "file": "captures/shop_day11_hp.png",
+        "text": {"hp": "24900"},
+    },
 ]
 
 

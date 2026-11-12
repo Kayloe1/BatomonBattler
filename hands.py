@@ -500,6 +500,36 @@ class Hands:
         return self._press_and_wait("confirm result", "result", reader.RESULT_CONFIRM,
                                     {"shop", "event", "run_over", "gift_box", "trinket_pick", "cash_in"}, 40)
 
+    def select_target(self, where: tuple[str, int]) -> Result:
+        """On "Select a target": click the monster in ("team"|"bench", i), then Confirm.
+
+        Confirm is pressed only once the game has enabled it (it turns red after a valid click).
+        """
+        name = f"select target {where}"
+        before = self.look()
+        if before.get("screen") != "select_target":
+            return self._log(name, Result(False, f"not on the target screen ({before.get('screen')})", before))
+        slots = before["team"] if where[0] == "team" else before["bench"]
+        if slots[where[1]] is None:
+            return self._log(name, Result(False, f"no monster in {where}", before))
+        box = reader.target_team_slot(where[1]) if where[0] == "team" else reader.target_bench_slot(where[1])
+        clicks = self._click(box)
+        if self.dry_run:
+            return self._log(name, Result(True, "dry run: nothing sent", before, None, clicks))
+        state = before
+        for _ in range(10):
+            time.sleep(0.4)
+            state = self.look(save_if_unreadable=False)
+            if state.get("screen") != "select_target" or state.get("confirm_enabled"):
+                break
+        if state.get("screen") == "select_target" and not state.get("confirm_enabled"):
+            return self._log(name, Result(False, "Confirm stayed grey after clicking the monster", before, state, clicks))
+        if state.get("screen") == "select_target":
+            clicks += self._click(reader.TARGET_CONFIRM)
+        wanted = {"shop", "event", "gift_box", "trinket_pick", "cash_in", "run_over"}
+        after = self.wait_for(wanted, 40)
+        return self._log(name, Result(after.get("screen") in wanted, f"now on '{after.get('screen')}'", before, after, clicks))
+
     def leave_title(self) -> Result:
         """Click on the title screen ("press any key to start"); the main menu follows."""
         return self._press_and_wait("leave title", "title", reader.TITLE_ANYWHERE, {"main_menu", "main_menu_continue", "shop", "new_run"}, 20)
@@ -510,8 +540,37 @@ class Hands:
         New Run is never pressed on this menu: it would abandon the run that is open.
         """
         return self._press_and_wait("continue run", "main_menu_continue", reader.MAIN_MENU_CONTINUE,
-                                    {"shop", "result", "event", "gift_box", "trinket_pick", "cash_in",
-                                     "trainer_pick", "battle", "matchmaking"}, 30)
+                                    {"continue_confirm", "shop", "result", "event", "gift_box", "trinket_pick",
+                                     "cash_in", "trainer_pick", "battle", "matchmaking"}, 30)
+
+    def confirm_continue(self) -> Result:
+        """Press Confirm on the panel that follows Continue, only for a CASUAL run.
+
+        Same gate as start_casual_run(): two fresh captures in a row must both show the panel
+        with the exact "CASUAL MODE" label. Anything else (a Ranked label, an unreadable one)
+        is refused and nothing is clicked; this method never presses Confirm for a Ranked run.
+        """
+        name = "confirm continue"
+        before = self.look()
+        if before.get("screen") != "continue_confirm":
+            return self._log(name, Result(False, f"not on the continue panel ({before.get('screen')})", before))
+        if self.dry_run:
+            return self._log(name, Result(True, "dry run: nothing sent", before))
+        state = before
+        for _ in range(2):
+            time.sleep(0.3)
+            state = self.look()
+            if not (state.get("screen") == "continue_confirm" and state.get("mode") == "casual"
+                    and not state["problems"]):
+                return self._log(name, Result(
+                    False, f"NOT confirmed: the saved run is not shown as CASUAL MODE "
+                           f"(mode={state.get('mode')}, screen={state.get('screen')})", before, state))
+        clicks = self._click(reader.CONTINUE_CONFIRM)
+        wanted = {"shop", "result", "event", "gift_box", "trinket_pick", "cash_in", "trainer_pick",
+                  "battle", "matchmaking"}
+        after = self.wait_for(wanted, 40)
+        ok = after.get("screen") in wanted
+        return self._log(name, Result(ok, f"Casual run continued; now on '{after.get('screen')}'", before, after, clicks))
 
     def cash_in(self) -> Result:
         """Press "Cash In" on a trinket dialog (e.g. Fake Diamond after a loss: gain money)."""
@@ -581,7 +640,7 @@ class Hands:
         return self._press_and_wait(f"pick trinket {k}", "trinket_pick", reader.trinket_card(k),
                                     {"shop", "gift_box"}, 20)
 
-    def choose_event(self, k: int) -> Result:
+    def choose_event(self, k: int) -> Result:  # may be followed by "select_target"
         """Click choice k (0 = top) on an event screen."""
         import numpy as np
         before = self.look()
@@ -591,7 +650,7 @@ class Hands:
         if not 0 <= k < len(boxes):
             return self._log("event", Result(False, f"no choice {k} (there are {len(boxes)})", before))
         return self._press_and_wait(f"event choice {k}", "event", boxes[k],
-                                    {"shop", "event", "gift_box", "trinket_pick"}, 40)
+                                    {"shop", "event", "gift_box", "trinket_pick", "select_target", "cash_in"}, 40)
 
 
 def reader_free_slots(state: dict) -> int:
