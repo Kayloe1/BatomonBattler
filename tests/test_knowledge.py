@@ -58,9 +58,7 @@ class Lists(unittest.TestCase):
             if n != "Talonite":  # event monster (winged fossil), not in the shop roster
                 self.assertIn(n, monsters)
         for n in list(k.ITEM_AUTO_OK) + list(k.ITEM_DECISIONS) + list(k.TICKETS):
-            # Upgrade Disc comes from gifts; Basic Bait was a shop item in September but is not in
-            # the November Batopedia capture (removed by a patch, or missed): keep the rule, flag it.
-            if n not in {"Upgrade Disc", "Basic Bait"}:
+            if n != "Upgrade Disc":  # comes from gifts, not the shop
                 self.assertIn(n, items)
         for n in list(k.AVOID_TRAINERS) + k.TRAINER_PREFERENCE:
             self.assertIn(n, trainers)
@@ -68,7 +66,7 @@ class Lists(unittest.TestCase):
 
     def test_item_policy(self):
         self.assertEqual(k.item_policy("Coupon"), "auto")
-        self.assertEqual(k.item_policy("Basic Bait"), "decide")
+        self.assertEqual(k.item_policy("Red Coin"), "decide")
         self.assertEqual(k.item_policy("Blue Ticket"), "decide")
         self.assertEqual(k.item_policy("Something New"), "decide")
 

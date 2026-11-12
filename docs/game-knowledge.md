@@ -33,7 +33,6 @@ Team slots 0 to 2 are the top row and 3 to 5 the bottom row, left to right. The 
 ## Items that need a decision
 
 - **Tickets replace the whole shop** with one rarity, so buy what you want first. Blue (Rare) is the best way to find amplifiers.
-- **Basic Bait** lowers the shop rank for the rest of the run: useful early, harmful while you hunt Rare amplifiers, fine again late. It is missing from the November item capture, so check that it still exists.
 - **Upgrade Disc** levels the very next monster bought, even a free one, and that copy will not merge.
 - Red Coin trades a life for money; Green Stone may transform a Common carry; Voucher gives a random shop monster.
 - Plain free items (Cake, Coupon, Fake Coin, Feast, Gray Chip, berries, Focus Pill) are safe to use. Coupon goes before buying monsters.

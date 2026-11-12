@@ -250,7 +250,7 @@ def move(s: RunState, src: tuple[str, int], dst: tuple[str, int]) -> RunState:
 
 # Items whose effect is modelled. Anything else that costs $0 is used anyway
 # unless it is in AVOID_ITEMS; paid unmodelled items are skipped.
-AVOID_ITEMS = {"Basic Bait", "Recombobulator", "Magic Lasso"}
+AVOID_ITEMS = {"Recombobulator", "Magic Lasso"}
 
 
 def use_item(s: RunState, i: int, rng: random.Random | None = None) -> RunState:

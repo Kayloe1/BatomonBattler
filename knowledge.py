@@ -111,10 +111,6 @@ ITEM_AUTO_OK = {"Cake", "Coupon", "Fake Coin", "Feast", "Gray Chip", "Nana Berry
 still uses up the day's item use and its shop slot refills, often with a paid card."""
 
 ITEM_DECISIONS = {
-    # Basic Bait is missing from the November Batopedia capture (data/items.csv); check it still exists.
-    "Basic Bait": "lowers the shop rank for the REST of the run: take it early while you still need "
-                  "Commons; skip it once you are hunting Rare amplifiers; fine again late once every "
-                  "amplifier you want is on the board",
     "Red Coin": "money for a life: only when that life cannot change where the next loss leaves you",
     "Green Stone": "turns a random Common into an Uncommon: could hit a Common carry",
     "Voucher": "a random shop monster for free; only when every remaining card is useful (it does sell for money)",
