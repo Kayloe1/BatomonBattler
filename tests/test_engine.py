@@ -232,6 +232,19 @@ class Events(unittest.TestCase):
         self.assertGreater(v, 0)
         self.assertFalse(guess)
 
+    def test_target_is_found_on_the_target_screen_by_level_and_badges(self):
+        from engine import events
+        s = self.state()
+        unit, why = events.best_target(small_planner(), s, "Level up a monster (max level 4)")
+        self.assertIsNotNone(unit)
+        screen = {"team": [None, {"name": None, "level": unit.level,
+                                  "stats": [{"stat": k, "value": v} for k, v in unit.stats if k != "multicast"]}],
+                  "bench": []}
+        self.assertEqual(events.find_on_screen(unit, screen), ("team", 1))
+        self.assertIsNone(events.find_on_screen(unit, {"team": [None], "bench": []}))
+        strongest, _ = events.best_target(small_planner(), s, "Turn a monster SHINY")
+        self.assertIsNotNone(strongest)
+
     def test_unreadable_choices_fall_back(self):
         from engine import events
         self.assertEqual(events.pick(small_planner(), self.state(), [None, None, None])[0], 2)

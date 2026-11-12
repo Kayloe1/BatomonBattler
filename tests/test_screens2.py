@@ -53,6 +53,18 @@ class NewScreens(unittest.TestCase):
             self.assertGreater(reader._near(pic[y0:y1, x0:x1], (239, 66, 107), 40).mean(), 0.5)
         self.assertGreater(reader.CONTINUE_CONFIRM[0], reader.CONTINUE_CANCEL[2])
 
+    def test_select_target_screen(self):
+        st = state("select_target.png")
+        self.assertEqual(st["screen"], "select_target")
+        self.assertFalse(st["confirm_enabled"])
+        self.assertIsNone(st["team"][0])
+        self.assertEqual([b["value"] for b in st["team"][1]["stats"]], [150])
+        self.assertEqual(st["bench"], [None] * 4)
+        pic = np.asarray(window.canonical_picture(Image.open(CAP / "select_target.png")))
+        x0, y0, x1, y1 = reader.TARGET_BACK
+        self.assertGreater(reader._near(pic[y0:y1, x0:x1], (239, 66, 107), 40).mean(), 0.5)
+        self.assertLess(reader.TARGET_CONFIRM[2], reader.TARGET_BACK[0])     # Confirm never overlaps Back
+
     def test_title(self):
         self.assertEqual(state("title_screen.png")["screen"], "title")
         self.assertEqual(state("title_screen.png")["problems"], [])

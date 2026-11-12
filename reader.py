@@ -123,6 +123,10 @@ SCREENS: dict[str, list[tuple[int, int, tuple[int, int, int]]]] = {
     # Cancel / Confirm. The hamburger button top right is greyed out while it shows.
     "continue_confirm": [(600, 1215, RED), (1900, 1215, RED), (850, 900, (231, 231, 231)), (1250, 850, (255, 255, 255)),
                          (2480, 110, (123, 123, 123)), (25, 1118, (21, 157, 216)), (25, 1238, (21, 157, 216))],
+    # "Select a target": an event effect needs a monster. BENCH and MY TEAM panels sit in the middle,
+    # Confirm (grey until a monster is clicked) and Back below them.
+    "select_target": [(1500, 410, (255, 189, 8)), (1500, 760, PINK), (1350, 1330, RED), (1700, 1330, RED),
+                      (400, 210, (255, 189, 8))],
     # Title screen: the logo, the dragon silhouette and the dark "PRESS ANY KEY TO START" label
     "title": [(768, 240, (237, 103, 250)), (1408, 240, (67, 249, 245)), (1280, 739, (111, 49, 71)),
               (890, 1045, (55, 55, 55)), (1650, 1045, (55, 55, 55))],
@@ -142,6 +146,32 @@ def fast_forward_on(pic: np.ndarray) -> bool:
 
 # Buttons on the other screens
 RESULT_CONFIRM: Box = BATTLE_BUTTON
+TARGET_CONFIRM: Box = (850, 1290, 1225, 1385)
+TARGET_BACK: Box = (1335, 1290, 1715, 1385)
+
+
+def target_team_slot(i: int) -> Box:
+    """Team slot i on the "Select a target" screen (same order as the shop: 0-2 top row, 3-5 bottom)."""
+    col, row = i % TEAM_COLS, i // TEAM_COLS
+    return (868 + 288 * col, 812 + 232 * row, 1108 + 288 * col, 996 + 232 * row)
+
+
+def target_bench_slot(i: int) -> Box:
+    return (708 + 288 * i, 456, 948 + 288 * i, 640)
+
+
+def read_select_target(pic: np.ndarray) -> dict:
+    """Team and bench on the "Select a target" screen, and whether Confirm can be pressed yet."""
+    problems: list[str] = []
+    team = [_read_owned_slot(pic, target_team_slot(i), f"target team {i}", problems)
+            for i in range(TEAM_COLS * TEAM_ROWS)]
+    bench = [_read_owned_slot(pic, target_bench_slot(i), f"target bench {i}", problems) for i in range(BENCH_SLOTS)]
+    x0, y0, x1, y1 = TARGET_CONFIRM
+    enabled = bool(_near(pic[y0:y1, x0:x1], RED, 40).mean() > 0.5)
+    # badge reading problems here are not fatal: a slot can still be clicked
+    return {"team": team, "bench": bench, "confirm_enabled": enabled, "problems": [], "notes": problems}
+
+
 CONTINUE_CONFIRM: Box = (1300, 1160, 1955, 1265)
 CONTINUE_CANCEL: Box = (590, 1160, 1245, 1265)
 CONTINUE_MODE_LABEL: Box = (580, 600, 1000, 680)      # "CASUAL MODE", top left of the panel
@@ -1183,6 +1213,8 @@ def read_state(image: Image.Image) -> dict:
     elif state["screen"] == "continue_confirm":
         state["mode"] = continue_mode(pic)
         state["problems"] = []            # an unreadable mode is not a reading error: hands refuses to confirm
+    elif state["screen"] == "select_target":
+        state.update(read_select_target(pic))
     elif state["screen"] == "gift_box":
         state["problems"] = []
     elif state["screen"] == "trinket_pick":

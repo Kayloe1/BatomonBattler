@@ -272,6 +272,21 @@ def main(argv=None) -> int:
             log("continue_run", ok=r.ok, message=r.message)
             if not r.ok:
                 return stop(f"after Continue: {r.message} (capture: {(r.after or {}).get('saved_capture')})", r.after)
+        elif screen == "select_target":
+            h.last_image.save(hands_mod.CAPTURE_DIR / f"select_target_{datetime.now():%Y%m%d_%H%M%S}.png")
+            effect = (pending_event or {}).get("picked")
+            if brain:
+                pos, why = brain.event_target(last_shop_state, effect, state)
+            else:
+                pos = next(((w, i) for w in ("team", "bench") for i, s_ in enumerate(state[w]) if s_), None)
+                why = "simple rules take the first monster"
+            if pos is None:
+                return stop("Select a target: there is no monster to click", state)
+            r = h.select_target(pos)
+            think([f"Target for '{effect or 'the event effect'}': {pos[0]} slot {pos[1] + 1}. {why}. ({r.message})"])
+            log("select_target", effect=effect, target=list(pos), why=why, ok=r.ok, message=r.message)
+            if not r.ok:
+                return stop(f"Select a target: {r.message} (capture: {(r.after or {}).get('saved_capture')})", r.after)
         elif screen == "continue_confirm":
             # only a run shown as CASUAL MODE is continued (read twice); otherwise stop and tell
             r = h.confirm_continue()
