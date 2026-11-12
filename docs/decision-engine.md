@@ -120,22 +120,36 @@ front = right, above, adjacent is orthogonal), amplifier pieces, eggs stay on th
 Dirgefin and self-knockout monsters judged by the simulator rather than banned, and the
 same-row drag rule.
 
-## Offline results (2026-11-12)
+## Offline results
 
-Same shop seeds for both, opponents from the held-out pool (`--first-seed 2000`):
+### First version (2026-11-12, PR #3)
+Against the first opponent pool the engine won 23 of 24 offline runs. The first live
+Casual run (Chef) then won Days 1-6 and lost Days 7-11 (6 badges). Its logs
+(`runs/2026-11-12-chef/`) showed why: from Day 7 it fielded a slow Burn/shield team that
+beat the ghost opponents in long battles but lost to real players. The pool was too weak late.
+
+### Calibrated to the live run (2026-11-12)
+- Ghost teams now keep the permanent growth they would get from battles (`engine/growth.py`),
+  get more extra money per day, and their numbers are scaled up from day 5 (`POWER_RAMP`).
+  The settings were chosen so that the real Chef teams score close to their real results
+  (high on Days 1-6, low on Days 7-11) and the old simple rules win 16-17% of simulated
+  battles (21% in the real runs).
+- The planner also scores the board against the day after tomorrow, so a board that looks
+  safe today still keeps growing; trinkets the simulator cannot see get a small value from
+  their wording.
+- Settings were swept over 13 variants (24 runs each) and the best combination checked on
+  40 fresh runs:
 
 | Policy | Runs | Runs won | Mean badges | Battles won |
 |---|---|---|---|---|
-| Old simple rules | 300 | 0.7% | 2.8 | 32% |
-| Engine | 24 | 96% (23) | 9.96 | 81% |
+| Old simple rules | 300 | 0% | 1.2 | 16% |
+| Engine, previous settings | 40 | 2.5% | 4.9 | 47% |
+| Engine, current settings (k_quick 10, min_gain 0, margin weight 0.3) | 40 | 22.5% | 5.6 | 52% |
 
-The engine still loses many of its first three days (the board is small and the shop is
-luck), then wins most battles from day 4. These numbers are only as good as the simulator
-and the opponent pool: the pool is known to be easier than real players (the simple
-rules win 32% of simulated battles but won 3 of 14 real ones), and the simulator may
-over-value heals (step 3 notes). Expect real results to be lower; the real test is Casual runs.
+Rerolling matters most: without it the engine fell to 3.1 badges. Expect the real numbers
+to move as real opponent teams get logged (PR #6) and replace the ghosts.
 
 ## Speed
 
-About 2-10 s per shop decision on one core (more late in a run, when there is more money
+About 5-20 s per shop decision on one core (more late in a run, when there is more money
 and more candidates). A whole offline run takes 2-4 minutes.

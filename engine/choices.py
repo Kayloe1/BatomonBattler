@@ -49,6 +49,28 @@ def pick_trainer(offered: list[str | None]) -> tuple[int, str]:
 
 
 _INCOME = re.compile(r"Increase Income by \$(\d+)")
+_SIM_SOURCE = (data.DATA.parent / "sim" / "battle.py")
+
+
+def sim_knows(name: str) -> bool:
+    """Trinkets the simulator applies in battle (it names them in its source)."""
+    try:
+        return f'"{name}"' in _SIM_SOURCE.read_text(encoding="utf-8")
+    except OSError:
+        return False
+
+
+# Trinkets that act in the shop (next buy, sell value, rerolls...) are invisible to the
+# simulator. They get a small prior from their wording so they are not all scored zero.
+_PRIOR_WORDS = [("permanently", 0.02), ("Multicast", 0.02), ("Cooldown Speed", 0.012), ("Damage", 0.01),
+                ("free", 0.01), ("Trinket gift", 0.01), ("reroll", 0.006), ("Sell Value", 0.004)]
+RARITY_PRIOR = {"Common": 0.0, "Uncommon": 0.004, "Rare": 0.008, "Super Rare": 0.012, "Legendary": 0.016}
+
+
+def text_prior(name: str) -> float:
+    t = data.trinkets().get(name, {})
+    effect = t.get("effect", "")
+    return RARITY_PRIOR.get(t.get("rarity"), 0.0) + sum(v for w, v in _PRIOR_WORDS if w in effect)
 
 
 def pick_trinket(planner: Planner, s: RunState, offered: list[str | None]) -> tuple[int, str]:
@@ -65,6 +87,8 @@ def pick_trinket(planner: Planner, s: RunState, offered: list[str | None]) -> tu
         t = s.copy()
         t.trinkets = s.trinkets + [name]
         gain = planner.team_score(t, team, k) - base
+        if not sim_knows(name):
+            gain += text_prior(name)
         m = _INCOME.search(effect)
         if m:
             gain += planner.p.money * int(m.group(1)) * days_left

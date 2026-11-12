@@ -35,9 +35,10 @@ TICKETS = {"Gray Ticket", "Green Ticket", "Blue Ticket", "Purple Ticket", "Golde
 @dataclass
 class Params:
     k_final: int = 16          # opponents when reporting a board's score
-    k_quick: int = 6           # opponents inside the search (same ones for every candidate)
+    k_quick: int = 10          # opponents inside the search (same ones for every candidate)
     w_today: float = 1.0
     w_next: float = 0.6
+    w_next2: float = 0.3       # the day after tomorrow: keeps the board growing when today looks safe
     money: float = 0.003       # value of $1 carried to tomorrow ...
     money_cap: int = 40        # ... up to this much; more saved money buys nothing extra
     bench_money: float = 0.8   # share of the monsters' sell value counted as money
@@ -45,10 +46,11 @@ class Params:
     gift_scale: float = 1.0
     reroll_samples: int = 3
     lock_gain: float = 0.06
-    min_gain: float = 0.004    # an action must beat ending the turn by this much
+    min_gain: float = 0.0     # an action must beat ending the turn by this much
     greedy_steps: int = 3      # buys looked ahead after each candidate
     screen: int = 2            # cards tried per greedy step (best by a quick estimate)
     final_rounds: int = 3
+    margin_weight: float = 0.3   # how much "closer battles" count next to battles won
 
 
 @dataclass
@@ -92,6 +94,7 @@ class Planner:
     def __init__(self, evaluator: Evaluator, params: Params | None = None, seed: int = 0):
         self.ev = evaluator
         self.p = params or Params()
+        self.ev.margin_weight = self.p.margin_weight
         self.rng = random.Random(seed)
         self._arranged: dict[tuple, tuple[list, list]] = {}
 
@@ -109,7 +112,12 @@ class Planner:
             return self.p.w_today * stake_weight(s) * today.value
         nxt = self.ev.score(team, s.day + 1, k, hp=self._hp(s, s.day + 1), trainer=s.trainer,
                             trinkets=s.trinkets)
-        return self.p.w_today * stake_weight(s) * today.value + self.p.w_next * nxt.value
+        v = self.p.w_today * stake_weight(s) * today.value + self.p.w_next * nxt.value
+        if self.p.w_next2:
+            nxt2 = self.ev.score(team, s.day + 2, k, hp=self._hp(s, s.day + 2), trainer=s.trainer,
+                                 trinkets=s.trinkets)
+            v += self.p.w_next2 * nxt2.value
+        return v
 
     def win_today(self, s: RunState, team: list[Unit | None], k: int | None = None) -> float:
         return self.ev.score(team, s.day, k or self.p.k_final, hp=self._hp(s, s.day), trainer=s.trainer,
@@ -269,6 +277,8 @@ class Planner:
 
     def _reroll_value(self, s: RunState, team, bench) -> float | None:
         free = s.free_rerolls > 0
+        if self.p.reroll_samples <= 0:
+            return None
         if not free and s.money < s.reroll_price + 5:
             return None
         total = 0.0
