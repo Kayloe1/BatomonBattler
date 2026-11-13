@@ -49,19 +49,17 @@ below; see the end of the log.
   2560 x 1600 with black bars); the reader handles both.
 
 ## To build (found tonight, not built yet)
-1. **Purple Egg sprite.** Egg Breeder's egg is unnamed by the reader. Sprites cut from the bench matched the
-   opponent's Dragon Egg in `tests/test_reader.py`, so they were deleted; the egg needs its own handling
-   (it should stay on the bench and never be sold).
-2. Item-slot refill is not modelled (`model.use_item` leaves the slot empty); using a free item is slightly
-   better than the engine thinks.
-3. Event-only monsters are unknown to the simulator: Ignit (Burn 1, evolves on a victory into something
+1. Item-slot refill is not modelled (`model.use_item` leaves the slot empty). Live play is unaffected (the
+   bot reads the refilled shop after each action); only the value of using a paid item is a bit low.
+2. Event-only monsters are unknown to the simulator: Ignit (Burn 1, evolves on a victory into something
    unseen), Talonite, Wishwash, Cosmivore, Faebloom, Omnichrome (`data/special_monsters.csv`), Dryadell.
-4. Mirror, Glimmer and Legendary Potions are in the data but not modelled (paid unmodelled items are skipped).
-   Mirror Potion is a strong merge tool late; Legendary Potion only helps with empty slots and synergy.
-5. Permanent growth is not valued forward: the planner scores today and tomorrow with today's badges, so
-   Thorntail/Fumungus/Warhorn growth is undervalued (they carried both runs).
-6. The engine's "feed and sell" Bug move scored above keeping a strong Bug (Stingarde) on Day 2.
-7. Opponent Shiny monsters in battle are not read (`match_battle_sprite` has no Shiny templates).
+   Rhizuka (a foreign Rare from an event) is now in `data/foreign_monsters.csv` without its passive.
+3. The engine's "feed and sell" Bug move scored above keeping a strong Bug (Stingarde) on Day 2.
+4. Opponent Shiny monsters in battle are not read as Shiny (battle matching uses plain sprites only).
+5. The Stats window does not find yellow "Inflicted N Shock" lines as text bands.
+
+Done later in the night: Purple Egg named on team/bench (kept out of battle matching), Mirror / Glimmer /
+Legendary Potions modelled, and `Params.grow_next` (tomorrow is scored with one battle's permanent growth).
 
 ## Log
 
