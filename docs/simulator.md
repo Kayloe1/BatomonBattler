@@ -45,9 +45,16 @@ mine = team_from_reader(reader.read_state(image))   # shop screen -> team
 - `stats` is optional. When given (the badges the reader sees), it replaces the Batopedia numbers for that
   level, so buffs bought in the shop are included. Without it, the level's Batopedia numbers are used, and
   badge-type trinket and trainer bonuses (Wood Sword, Chef, Chemist...) are added.
-- Optional per slot: `multicast`, `cooldown`, `speed` (% cooldown speed), `protect`.
-- `hp` is the trainer's HP; or give `"day": 3` to use the day table for days 1-8 (300, 500, 800, 1400,
-  2400, 3800, 5700, 8300, seen in the 2026-11-11 runs). For later days pass `hp`.
+- Optional per slot: `multicast`, `cooldown`, `speed` (% cooldown speed), `protect`, `shiny` (true for a
+  Shiny copy; what it changes is in `sim/battle.py`, `SHINY_*`, from the cards seen on 2026-11-12:
+  Stingarde/Electranade/Pyronade keep casting, Magmite and Venopuff gain +10 Shield +1 Burn / +1 Poison per
+  level at battle start, Stalagrove/Geminiss/Blixie parameter x1.2, Torrantler cooldown 7 -> 5.5 s; numbers on
+  the badges, like Shiny Cobrex's 360 Poison, are read as usual).
+- Trinkets with `stats` given are already on the badges and are not added again. Clubs stack additively
+  (two Giant Clubs: x2.4, seen on cards). The engine applies a trinket it is *considering* to the badges
+  itself (`engine/choices.with_trinket_stats`).
+- `hp` is the trainer's HP; or give `"day": 3` to use the day table for days 1-14 (300, 500, 800, 1400,
+  2400, 3800, 5700, 8300, 11600, 17300, 24900, 34700, 47300, 63000).
 - `coffee: true` means a Coffee was used before this battle.
 
 ## How a battle runs
