@@ -34,6 +34,7 @@ EXTRA_UNITS = {
 PASSIVE_PATTERNS: dict[str, list[str]] = {
     "Mosslug": [r"\+(\d+) Damage"],
     "Pebbler": [r"\+(\d+) Shield"],
+    "Pyrokami": [r"\+(\d+) Burn"],
     "Boomagon": [r"\+(\d+)%"],
     "Noxnimbus": [r"\+(\d+) Poison"],
     "Runerock": [r"[Rr]emove (\d+)"],
