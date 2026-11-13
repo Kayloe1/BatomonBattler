@@ -228,11 +228,17 @@ def score_effect(planner: Planner, s: RunState, effect: str) -> tuple[float, str
             return 0.0, "the egg does nothing in battle until it hatches", False
         trinket = next((n for n in data.trinkets() if _key(n) == _key(name)), None)
         if trinket:
+            from .choices import _HP, with_trinket_stats
             t = s.copy()
             t.trinkets = s.trinkets + [trinket]
+            hp = _HP.search(data.trinkets()[trinket].get("effect", ""))
+            if hp and t.hp_today:                 # Dryad's Charm, Mysterious Charm, Barbell...
+                n = int(hp.group(1))
+                t.hp_today = int(t.hp_today * (1 + n / 100)) if hp.group(2) else t.hp_today + n
             team, _ = planner.final_layout(s)
             k = planner.p.k_final
-            return planner.team_score(t, team, k) - planner.team_score(s, team, k), f"trinket {trinket} in the simulator", False
+            return (planner.team_score(t, with_trinket_stats(team, trinket, s.trinkets), k)
+                    - planner.team_score(s, team, k)), f"trinket {trinket} in the simulator", False
         return UNKNOWN_GAIN, f"'{name}' is not in my data yet, so a small fixed guess", True
     return UNKNOWN_GAIN, "an effect I cannot model yet, so a small fixed guess", True
 
