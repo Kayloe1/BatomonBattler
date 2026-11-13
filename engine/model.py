@@ -84,6 +84,7 @@ class Card:
     kind: str                                   # "monster" or "item"
     stats: tuple[tuple[str, int], ...] = ()
     rarity: str | None = None
+    shiny: bool = False                         # "SHINY" tag on the card (reader.shiny_tag_score)
 
 
 @dataclass
@@ -176,6 +177,8 @@ def buy(s: RunState, i: int) -> RunState:
             t.bug_discount_used = True
     stats = dict(card.stats) if card.stats else None
     unit = new_unit(card.name, price, 1, stats)
+    if card.shiny:
+        unit = replace(unit, shiny=True)
     place = _first_free(t)
     if place is None:
         t.bench.append(unit)                    # temporary 5th slot: it merges at once
@@ -543,7 +546,8 @@ def card_from_reader(card: dict | None) -> Card | None:
     if card is None or card.get("name") is None or card.get("price") is None:
         return None
     return Card(card["name"], card["price"], card.get("kind") or "monster",
-                tuple(sorted(_stats_from_badges(card.get("stats")).items())), card.get("rarity"))
+                tuple(sorted(_stats_from_badges(card.get("stats")).items())), card.get("rarity"),
+                shiny=bool(card.get("shiny")))
 
 
 def from_reader(state: dict, memory: dict | None = None) -> RunState:

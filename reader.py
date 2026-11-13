@@ -806,6 +806,8 @@ def learn_card_sprites(pic: np.ndarray, state: dict) -> list[Path]:
     for i, card in enumerate(state.get("shop") or []):
         if not card or card.get("kind") != "monster" or not card.get("name"):
             continue
+        if card.get("shiny"):
+            continue                      # a Shiny palette would teach a wrong colour for the species
         name = card["name"]
         have = list(CARD_SPRITE_DIR.glob(f"{name}.png")) + list(CARD_SPRITE_DIR.glob(f"{name}__*.png"))
         if len(have) >= CARD_SPRITES_PER_NAME:
@@ -1202,8 +1204,30 @@ def _read_shop_slot(pic: np.ndarray, i: int, masks: dict, problems: list[str],
     frame = pic[1300, 507 + 312 * i]
     rarity = next((r for r, c in FRAME_RARITY.items() if _near(frame, c, 20)), None)
     greyed = bool(_near(text_rgb, CARD_GREY, 4).sum() >= 300)
-    return {"name": name, "price": price, "kind": kind, "stats": stats,
+    card = {"name": name, "price": price, "kind": kind, "stats": stats,
             "rarity": rarity, "greyed": greyed, "raw": raw_name}
+    if kind == "monster" and shiny_tag_score(pic, i) >= SHINY_TAG_MIN:
+        card["shiny"] = True
+    return card
+
+
+# A Shiny shop card has a pastel "SHINY" word with a thick black outline at its top right. Its
+# outline mask (cut from captures/manual_shop_glimmer_all_shiny_cards.png) scores 0.95-1.0 on
+# Shiny cards and at most 0.23 on the plain cards of 50+ saved shop captures.
+SHINY_TAG_MIN = 0.6
+_shiny_tag: np.ndarray | None = None
+
+
+def shiny_tag_score(pic: np.ndarray, i: int) -> float:
+    global _shiny_tag
+    if _shiny_tag is None:
+        _shiny_tag = (np.asarray(Image.open(ROOT / "templates" / "shiny_tag.png")) > 127).astype(np.float32)
+    x0 = shop_card(i)[0]
+    region = pic[1152:1230, x0 + 142:x0 + 318]
+    dark = (region.max(axis=2) < 60).astype(np.float32)
+    if dark.shape[0] < _shiny_tag.shape[0] or dark.shape[1] < _shiny_tag.shape[1] or dark.sum() == 0:
+        return 0.0
+    return float(cv2.matchTemplate(dark, _shiny_tag, cv2.TM_CCOEFF_NORMED).max())
 
 
 # ------------------------------------------------------------- shop read ----

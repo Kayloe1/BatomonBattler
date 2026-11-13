@@ -251,3 +251,19 @@ class Shiny(unittest.TestCase):
         st = self._read("shop_r2_day3.png")
         self.assertEqual(st["team"][4]["name"], "Stingarde")
         self.assertFalse(st["team"][4].get("shiny"))
+
+
+class ShinyShopCards(unittest.TestCase):
+    def test_glimmer_shop_cards_are_shiny(self):
+        path = CAPTURES / "manual_shop_glimmer_all_shiny_cards.png"
+        if not path.exists():
+            self.skipTest("captures/manual_shop_glimmer_all_shiny_cards.png not here")
+        st = reader.read_state(Image.open(path).convert("RGB"))
+        self.assertEqual([bool(c and c.get("shiny")) for c in st["shop"]], [True, False, True, True, True])
+
+    def test_plain_shop_cards_are_not_shiny(self):
+        path = CAPTURES / "shop_r2_day3.png"
+        if not path.exists():
+            self.skipTest("captures/shop_r2_day3.png not here")
+        st = reader.read_state(Image.open(path).convert("RGB"))
+        self.assertFalse(any(c and c.get("shiny") for c in st["shop"]))

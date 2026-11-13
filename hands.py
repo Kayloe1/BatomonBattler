@@ -299,8 +299,12 @@ class Hands:
         slot = after[kind][k]
         if slot["name"] is None:
             pic = np.asarray(window.canonical_picture(self.last_image))
-            reader.learn_sprite(card["name"], reader.crop(pic, self._slot_box(new[0])))
+            # a Shiny card's sprite is saved as "Name@shiny" so it never becomes a normal template
+            learn_as = card["name"] + (reader.SHINY_SUFFIX if card.get("shiny") else "")
+            reader.learn_sprite(learn_as, reader.crop(pic, self._slot_box(new[0])))
             slot["name"] = card["name"]
+            if card.get("shiny"):
+                slot["shiny"] = True
         elif slot["name"] != card["name"]:
             raise RuntimeError(f"bought {card['name']} but the sprite in {kind} {k} matches {slot['name']}")
 

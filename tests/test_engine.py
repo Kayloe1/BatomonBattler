@@ -406,3 +406,10 @@ class TrinketStatsOnBadges(unittest.TestCase):
         self.assertAlmostEqual(two.stat("poison"), 300 * 2.4, delta=2)
         fast = with_trinket_stats([new_unit("Venopuff", 15)], "Giant Club", [])[0]
         self.assertEqual(fast.stat("poison"), 4)        # 3.5 s cooldown: no bonus
+
+
+class ShinyCards(unittest.TestCase):
+    def test_buying_a_shiny_card_gives_a_shiny_unit(self):
+        s = RunState(day=3, money=30, shop=[model.Card("Stingarde", 10, "monster", shiny=True), None, None, None, None])
+        t = model.buy(s, 0)
+        self.assertTrue(any(u.shiny for _, _, u in t.owned()))
