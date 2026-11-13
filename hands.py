@@ -228,7 +228,13 @@ class Hands:
             import pyautogui
             self._focus()
             pyautogui.moveTo(x, y, duration=0.15)
-            pyautogui.scroll(clicks)
+            # pyautogui on Windows passes the number straight to mouse_event as wheel units,
+            # and one wheel notch is 120 units: scroll(-15) was 1/8 of a notch and the game
+            # ignored it. Send whole notches, one event each.
+            step = 120 if clicks > 0 else -120
+            for _ in range(abs(clicks)):
+                pyautogui.scroll(step)
+                time.sleep(0.04)
             time.sleep(0.3)
         return [["scroll", x, y, clicks]]
 

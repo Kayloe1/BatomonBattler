@@ -30,6 +30,17 @@ class StatsWindow(unittest.TestCase):
         self.assertEqual(by[(0, 4)]["lines"], {"dealt": 75, "healed": 90, "triggered": 3})
         self.assertEqual(by[(1, 0)]["lines"], {"dealt": 1, "triggered": 1})
 
+    def test_shock_burn_shield_lines_and_wide_threes(self):
+        # yellow Shock, orange Burn and brown "Applied N shield" lines; the wide 3 of "Triggered 3"
+        name = "battles/20261112_132653_stats_top.png"
+        if not (ROOT / "captures" / name).exists():
+            self.skipTest(f"captures/{name} not here")
+        r = reader.read_stats_window(pic(name))
+        self.assertEqual(r["problems"], [])
+        by = {(c["header"], c["slot"]): c["lines"] for c in r["cells"]}
+        self.assertEqual(by[(0, 4)], {"dealt": 75, "inflicted": {"Shock": 10}, "triggered": 10})
+        self.assertEqual(by[(1, 1)], {"shielded": 200, "inflicted": {"Burn": 20}, "triggered": 5})
+
     def test_unscrolled_window_reports_the_missing_opponent_row(self):
         r = reader.read_stats(pic("stats_day2.png"), None)
         self.assertEqual(r["my_team"][0], {"dealt": 150, "triggered": 3})

@@ -970,7 +970,11 @@ def read_battle(pic: np.ndarray) -> dict:
 # the window's edge until it is scrolled.
 
 STATS_LINE_COLOURS = {"dealt": (239, 66, 107), "inflicted": (123, 87, 161),
-                      "healed": (87, 138, 201), "triggered": (121, 174, 208)}
+                      "healed": (87, 138, 201), "triggered": (121, 174, 208),
+                      # each status has its own colour: purple Poison (read from the word),
+                      # yellow Shock and orange Burn; "Applied N shield" is brown
+                      "inflicted_shock": (231, 198, 28), "inflicted_burn": (237, 107, 58),
+                      "shielded": (164, 124, 65)}
 STATS_BORDER = (156, 156, 173)
 STATS_VIEW_Y = (250, 1318)       # the part of the window that shows cards (the rest is frame)
 STATS_CARD_TOP_GAP, STATS_CARD_H, STATS_ROW_PITCH = 19, 237, 260
@@ -1071,7 +1075,9 @@ def _stats_lines(rgb: np.ndarray, problems: list[str], where: str) -> dict:
         value = _to_int(digits)
         if value is None:
             problems.append(f"{where}: cannot read the number of a '{kind}' line ('{digits}')")
-        if kind == "inflicted":
+        if kind.startswith("inflicted_"):
+            out.setdefault("inflicted", {})[kind.split("_", 1)[1].title()] = value
+        elif kind == "inflicted":
             raw = "".join(store().classify("statsword", g.bitmap)[0] for g in words[2]) if len(words) > 2 else ""
             status = resolve(raw, KNOWN_STATUSES, ignore_case=True) or (raw if raw and "?" not in raw else None)
             if status is None:
