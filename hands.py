@@ -515,7 +515,7 @@ class Hands:
     def confirm_result(self) -> Result:
         """Press CONFIRM on the result box; the next shop, an event or the end of the run follows."""
         return self._press_and_wait("confirm result", "result", reader.RESULT_CONFIRM,
-                                    {"shop", "event", "run_over", "gift_box", "trinket_pick", "cash_in"}, 40)
+                                    {"shop", "event", "run_over", "gift_box", "trinket_pick", "cash_in", "overflow"}, 40)
 
     def select_target(self, where: tuple[str, int]) -> Result:
         """On "Select a target": click the monster in ("team"|"bench", i), then Confirm.
@@ -593,7 +593,7 @@ class Hands:
                            f"(mode={state.get('mode')}, screen={state.get('screen')})", before, state))
         clicks = self._click(reader.CONTINUE_CONFIRM)
         wanted = {"shop", "result", "event", "gift_box", "trinket_pick", "cash_in", "trainer_pick",
-                  "battle", "matchmaking"}
+                  "battle", "matchmaking", "overflow"}
         after = self.wait_for(wanted, 40)
         ok = after.get("screen") in wanted
         return self._log(name, Result(ok, f"Casual run continued; now on '{after.get('screen')}'", before, after, clicks))
@@ -601,7 +601,7 @@ class Hands:
     def cash_in(self) -> Result:
         """Press "Cash In" on a trinket dialog (e.g. Fake Diamond after a loss: gain money)."""
         return self._press_and_wait("cash in", "cash_in", reader.CASH_IN_BUTTON,
-                                    {"shop", "event", "run_over", "gift_box", "trinket_pick", "cash_in"}, 40)
+                                    {"shop", "event", "run_over", "gift_box", "trinket_pick", "cash_in", "overflow"}, 40)
 
     def start_casual_run(self) -> Result:
         """Start a new CASUAL Pantra run from the end-of-run screen or the New Run dialog.
@@ -663,8 +663,9 @@ class Hands:
 
     def pick_trinket(self, k: int) -> Result:
         """Click trinket card k (0 = left). The shop comes back, or another gift."""
+        # a new day's monster (Swim Coach: a Water monster each day) can arrive with team and bench full
         return self._press_and_wait(f"pick trinket {k}", "trinket_pick", reader.trinket_card(k),
-                                    {"shop", "gift_box"}, 20)
+                                    {"shop", "gift_box", "overflow"}, 20)
 
     def choose_event(self, k: int) -> Result:  # may be followed by "select_target"
         """Click choice k (0 = top) on an event screen."""

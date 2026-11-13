@@ -564,8 +564,10 @@ def unit_from_reader(slot: dict | None, price_hint: int | None = None) -> Unit |
         return None
     name = slot.get("name")
     level = slot.get("level") or 1
-    sp = data.species(name)
     stats = _stats_from_badges(slot.get("stats"))
+    if name is None and any(v for k, v in stats.items() if k != "multicast")             and not (level == 1 and {k: v for k, v in stats.items() if v and k != "multicast"} == {"damage": 1}):
+        name = data.STAND_IN          # unknown monster (not the Dragon Egg: Lv1, 1 damage, left unnamed)
+    sp = data.species(name)
     if sp and "multicast" not in stats:
         stats["multicast"] = sp.stats(level).get("multicast", 1)
     paid = price_hint if price_hint is not None else (sp.cost * data.COPIES_FOR_LEVEL.get(level, 1) if sp else 0)

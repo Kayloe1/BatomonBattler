@@ -358,15 +358,15 @@ class Planner:
         for k, u in enumerate(s.bench):
             if u is None or not self._sellable(s, u) or u.sell_price() <= 0 and u.growth():
                 continue
-            if u.name in on_sale:
-                continue
+            if u.name in on_sale or any(o is u for o in team):
+                continue                         # a third copy is for sale, or the arrangement fields it
             copies = sum(1 for o in owned if o.name == u.name and o.level == u.level)
             need = 3 if u.level == 1 else 2
             if u.level < 3 and copies >= need - 1:
                 nxt = model.new_unit(u.name, 0, u.level + 1)
                 if power(nxt) > 1.1 * weakest:
                     continue                     # a merge here would improve the team: worth holding
-            if power(u) > weakest and not any(o is u for o in team):
+            if power(u) > weakest:
                 # stronger than the weakest fielded monster: the arrangement will use it, not a dead weight
                 continue
             out.append((BENCH, k, u))

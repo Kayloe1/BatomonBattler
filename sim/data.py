@@ -143,6 +143,8 @@ def load_species() -> dict[str, Species]:
     if foreign.exists():
         with open(foreign, newline="", encoding="utf-8") as f:
             rows += [dict(r) for r in csv.DictReader(f)]
+    with open(DATA / "stand_in_monsters.csv", newline="", encoding="utf-8") as f:
+        rows += [dict(r) for r in csv.DictReader(f)]
     for name, e in EXTRA_UNITS.items():
         rows.append({"name": name, "cost": e["cost"], "rarity": e["rarity"],
                      "types": "/".join(e["types"]), "cooldown_s": e["cooldown"],

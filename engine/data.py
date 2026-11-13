@@ -126,6 +126,8 @@ def roster() -> dict[str, Species]:
     if foreign.exists():
         with open(foreign, encoding="utf-8") as f:
             rows += [(r, True) for r in csv.DictReader(f)]
+    with open(DATA / "stand_in_monsters.csv", encoding="utf-8") as f:     # never in the shop, like foreign
+        rows += [(r, True) for r in csv.DictReader(f)]
     for row, is_foreign in rows:
         name = row["name"]
         cd = float(row["cooldown_s"])
@@ -166,6 +168,11 @@ def roster() -> dict[str, Species]:
             foreign=is_foreign,
         )
     return out
+
+
+# A monster the reader cannot name plays as this (data/stand_in_monsters.csv): its own badges, a typical
+# Rare's speed, no passive. Before, such a monster could neither join the team nor be sold.
+STAND_IN = "Unknown Rare"
 
 
 def species(name: str | None) -> Species | None:
