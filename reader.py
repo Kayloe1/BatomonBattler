@@ -108,7 +108,9 @@ SCREENS: dict[str, list[tuple[int, int, tuple[int, int, int]]]] = {
     "gift_box": [(460, 1300, PINK), (1150, 800, (248, 112, 88)), (1350, 800, (224, 152, 72)),
                  (1229, 768, (104, 64, 24)), (1400, 800, (200, 64, 40))],
     # "Select a trinket.": trinket cards over the dimmed shop, HIDE on the left
-    "trinket_pick": [(100, 1215, BLUE), (2300, 1215, (19, 19, 21)), (460, 1300, PINK), (1300, 215, (55, 41, 2))],
+    # (over plain black after an event's gift): so the white card faces and the pink TRINKET tag
+    "trinket_pick": [(100, 1215, BLUE), (460, 1300, PINK), (560, 320, (255, 255, 255)),
+                     (1280, 320, (255, 255, 255)), (600, 460, (233, 206, 228))],
     # Trainer pick: three yellow card headers over the "Select a trainer" box
     "trainer_pick": [(820, 222, YELLOW), (1483, 222, YELLOW), (2146, 222, YELLOW), (460, 1300, PINK),
                      (100, 1215, (14, 14, 14))],
