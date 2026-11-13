@@ -82,3 +82,24 @@ _(filled in at the end)_
 - **Day 6 won** easily (us 3454/3800). Fumungus went from Poison 6 to 21 in one battle (Noxalith x5) and
   dealt 1608; Shiny Stalagrove dealt 1368 (its damage reached 374 = 18% of 2080 shield received).
   **Fumungus + Noxalith below it is a strong engine** (permanent growth every Noxalith cast).
+- Day 7 (HP 5700): rerolled into an **Aegistruct** (sim 62% -> 79% in place of Shiny Stingarde) and bought
+  **Thorntail** (+8 Damage permanently whenever an ally inflicts Poison). Sold Cicadence and Shogapede for room.
+  **Lost Day 7 by 389 HP** (-3 lives, 3 left) to a mirror poison team (2 Noxnimbus, Puffloon, Shiny Venopuff
+  Lv2, Shiny Spinarai Lv2, Thorntail 543): 787 Poison stacked on us. Our Thorntail grew 50 -> 170 in that
+  one battle. The **Locked Box** paid out on that loss: **Haste Orb** (Super Rare, +10% cooldown speed).
+- Day 8 (HP 8300, $80): **a Coupon only discounts the shop it is used in; rerolling after it wastes it.**
+  Kept the team (sim 73%), won (4 badges). Event: monster professor -> "Level up a monster (max level 4)" /
+  "Gain Research Notes" / "Gain $60". Levelled Fumungus 2 -> 3: **an event level-up keeps permanent growth**
+  (Poison 39 kept) and the card's cooldown already includes Haste Orb (3.0 -> 2.7 s).
+- Day 9 (HP 11600, $141): bought 2nd copies (Noxalith, Runerock, Thorntail); a "LV 2" Thorntail merged:
+  **the merge kept the team copy's growth (298)** and its team slot. **The gift's rarity follows the merged
+  monster's rarity**: Magmite (Common) offered Common trinkets, Thorntail (Rare) offered Rare ones
+  (Warhorn, Ancient Plume, Mega Duplicator). Took **Warhorn** (On Battle Start: your monsters +10 Damage
+  permanently; only team monsters get it). Won (5 badges, 7773/11600 left).
+- No event after Day 9: **events came after Days 2, 5 and 8** (every 3 days).
+- Day 10 (HP 17300, $129): added Noxnimbus next to Fumungus and Thorntail. **Rare Candy ($40, "level up a
+  random level 1 monster") can pick a bench monster**: it levelled the benched Shiny Stingarde to Lv2 (300).
+  Hovering shop cards shows "RIGHT CLICK TO INSPECT". Won Day 10 easily (15867/17300 left, 6 badges);
+  Thorntail reached 1038 damage, Fumungus 2561.
+- Item note: **Ultra Candy (Mythical, $60) levels a random level 3 monster**; with only one Lv3 it is a
+  guaranteed Lv4 (Fumungus Lv4: CD 1.5 s, Poison 12, 1200%).
