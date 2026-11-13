@@ -1,0 +1,44 @@
+{
+  "title": "Egg Breeder run, Day 3 win with a Shiny Stingarde (2026-11-12 night, played by hand)",
+  "sources": "Battle screen, Stats screen and end HP bars read by eye (docs/overnight-play-notes.md). End: us 409/800, them 0/800. Opponent trainer Redhead.",
+  "a": {
+    "trainer": "Egg Breeder", "hp": 800,
+    "slots": [
+      {"name": "Stingarde", "level": 1, "stats": {"damage": 150}},
+      {"name": "Magmite", "level": 1, "stats": {"shield": 40, "burn": 4}},
+      {"name": "Stingarde", "level": 1, "stats": {"damage": 150}, "shiny": true},
+      {"name": "Panbud", "level": 1, "stats": {"damage": 25}},
+      {"name": "Guardiant", "level": 1, "stats": {"damage": 31}},
+      {"name": "Guardiant", "level": 1, "stats": {"damage": 39}}
+    ]
+  },
+  "b": {
+    "trainer": "Redhead", "hp": 800,
+    "slots": [
+      {"name": "Pyronade", "level": 1, "stats": {"burn": 20}},
+      {"name": "Bumblebolt", "level": 1, "stats": {"damage": 3, "shock": 1}},
+      {"name": "Craghorn", "level": 1, "stats": {"damage": 34, "shield": 34}},
+      {"name": "Dragon Egg", "level": 1, "stats": {"damage": 1}},
+      {"name": "Bumblebolt", "level": 1, "stats": {"damage": 3, "shock": 1}},
+      {"name": "Panbud", "level": 1, "stats": {"damage": 25}}
+    ]
+  },
+  "expect": {
+    "winner": "a",
+    "a_units": {
+      "1": {"triggered": 1, "dealt": 150},
+      "2": {"triggered": 4, "inflicted_burn": 16},
+      "3": {"triggered": 3, "dealt": 450},
+      "4": {"triggered": 3, "dealt": 75},
+      "5": {"triggered": 4, "dealt": 124},
+      "6": {"triggered": 4, "dealt": 156}
+    },
+    "b_units": {
+      "1": {"triggered": 1, "inflicted_burn": 20},
+      "2": {"triggered": 7, "dealt": 63, "inflicted_shock": 7},
+      "3": {"triggered": 3, "dealt": 128},
+      "5": {"triggered": 7, "dealt": 63, "inflicted_shock": 7},
+      "6": {"triggered": 3, "dealt": 93}
+    }
+  }
+}

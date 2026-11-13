@@ -14,7 +14,8 @@ A team is a dict (or the JSON form of one):
     }
 
 A slot's "stats" (the badges on the shop screen) replace the Batopedia numbers when given.
-Optional per-slot keys: "cooldown", "multicast", "speed" (% cooldown speed), "protect".
+Optional per-slot keys: "cooldown", "multicast", "speed" (% cooldown speed), "protect",
+"shiny" (true: a self-knockout monster keeps casting).
 
 `simulate(team_a, team_b)` plays the battle and returns a BattleResult. Rules and guesses are
 listed in sim/rules.py.
@@ -56,6 +57,7 @@ class Unit:
     alive: bool = True
     disabled: bool = False        # abilities disabled (Celestia)
     protect: int = 0
+    shiny: bool = False           # Shiny copy: the self-knockout drawback is gone (Stingarde, seen 2026-11-12)
     extra_multicast: int = 0
     shelldra_next: float = 4.0
     casts: int = 0
@@ -111,6 +113,7 @@ class Trainer:
     poison: float = 0.0
     burn: float = 0.0
     shock: float = 0.0
+    shock_pending: float = 0.0    # Shock gained this instant; it boosts hits only from the next instant on
     heal_mult: float = 1.0
     shield_mult: float = 1.0
     link_cable: bool = False
@@ -147,7 +150,8 @@ def build_unit(side: int, slot: int, spec: dict, trainer: str | None, trinkets: 
     unit = Unit(side, slot, name, level, types, sp.rarity, float(spec.get("cooldown", lv.cooldown)),
                 stats, multicast, lv.passive_text if level > 1 else sp.passive, lv.param,
                 sp.is_ongoing, sp.has_ability() and not (sp.name in data.EVOLVES and level < 3),
-                speed=float(spec.get("speed", 0)), protect=int(spec.get("protect", 0)))
+                speed=float(spec.get("speed", 0)), protect=int(spec.get("protect", 0)),
+                shiny=bool(spec.get("shiny", False)))
     # Trainer / trinket bonuses that the badges would already show.
     if not given:
         if trainer == "Chef":
@@ -370,6 +374,8 @@ class Battle:
         target.hp -= amount - absorbed
 
     def heal(self, tr: Trainer, amount: float) -> None:
+        if tr.hp <= EPS and not self.immortal:
+            return                   # a trainer at 0 HP is out; a heal later in the same instant cannot revive it
         amount *= tr.heal_mult
         tr.hp += amount
         if SETTINGS["heal_cap"]:
@@ -433,7 +439,10 @@ class Battle:
                 u.inflicted["burn"] += u.stats["burn"]
             shock = self.shock_of(u)
             if shock > 0:
-                foe.shock += shock
+                if SETTINGS.get("shock_next_instant", True):
+                    foe.shock_pending += shock
+                else:
+                    foe.shock += shock
                 u.inflicted["shock"] += shock
                 self.on_ally_inflicts(u, "shock")
         if self.verbose:
@@ -469,7 +478,8 @@ class Battle:
         elif name == "Pebbler":
             u.stats["shield"] += p
         elif name in ("Stingarde", "Electranade", "Pyronade"):
-            self.knockout(u)
+            if not u.shiny:          # a Shiny copy keeps casting (Shiny Stingarde: 3 casts, 450 damage)
+                self.knockout(u)
         elif name == "Boomagon":
             b = self.behind(u)
             if b:
@@ -680,10 +690,16 @@ class Battle:
                             u.progress = min(u.progress, u.cooldown)
                             self.cast(u)
                             ready = True
-                            if not self.immortal and any(self.dead()):
+                            if (not self.immortal and not SETTINGS.get("deaths_after_instant", True)
+                                    and any(self.dead())):
                                 return self._result()
                 if not ready:
                     break
+            for tr in self.trainers:
+                tr.shock += tr.shock_pending
+                tr.shock_pending = 0.0
+            if not self.immortal and any(self.dead()):
+                return self._result()
             for side in (0, 1):
                 for u in self.living(side):
                     if u.is_("Shelldra") and u.active_passive() and u.shelldra_next <= self.t + EPS:

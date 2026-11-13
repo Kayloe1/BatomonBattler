@@ -156,9 +156,10 @@ class Mechanics(unittest.TestCase):
     def test_winner_and_draw(self):
         r = simulate(team([mon("Stingarde")], hp=100), team([], hp=100))
         self.assertEqual(r.winner, "a")
-        # Same instant: the player's side acts first (guess), so its hit ends the battle.
+        # Same instant: every cast of both sides resolves before deaths are checked (the opponent's
+        # Craghorn still cast at the 18 s instant our casts won at, 2026-11-12), so both die: draw.
         r = simulate(team([mon("Stingarde")], hp=100), team([mon("Stingarde")], hp=100))
-        self.assertEqual(r.winner, "a")
+        self.assertEqual(r.winner, "draw")
         # Both die to the same Poison tick: draw.
         r = simulate(team([mon("Venopuff")], hp=4), team([mon("Venopuff")], hp=4))
         self.assertEqual(r.winner, "draw")
