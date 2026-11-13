@@ -136,6 +136,16 @@ class BattleResult:
                 "statuses": list(self.statuses), "units": list(self.units)}
 
 
+# What a Shiny copy changes, from the cards seen in the game (2026-11-12). Each species changes
+# something different; species not listed here are simulated like the normal card.
+#  - self-knockout monsters keep casting (Shiny Stingarde's card has no "Knockout self"; Electranade
+#    and Pyronade are assumed to work the same way)
+#  - monsters without a passive gain a small permanent growth at battle start
+#  - Stalagrove's 15% became 18% (x1.2 on its parameter)
+SHINY_BATTLE_START = {"Magmite": {"shield": 10, "burn": 1}, "Venopuff": {"poison": 1}}
+SHINY_PARAM_MULT = {"Stalagrove": 1.2}
+
+
 def build_unit(side: int, slot: int, spec: dict, trainer: str | None, trinkets: list[str]) -> Unit:
     name = spec["name"]
     level = int(spec.get("level", 1))
@@ -152,6 +162,8 @@ def build_unit(side: int, slot: int, spec: dict, trainer: str | None, trinkets: 
                 sp.is_ongoing, sp.has_ability() and not (sp.name in data.EVOLVES and level < 3),
                 speed=float(spec.get("speed", 0)), protect=int(spec.get("protect", 0)),
                 shiny=bool(spec.get("shiny", False)))
+    if unit.shiny and unit.param and sp.name in SHINY_PARAM_MULT:
+        unit.param *= SHINY_PARAM_MULT[sp.name]
     # Trainer / trinket bonuses that the badges would already show.
     if not given:
         if trainer == "Chef":
@@ -573,6 +585,8 @@ class Battle:
 
     # ---------- battle start ----------
     def battle_start(self, u: Unit) -> None:
+        if u.shiny:
+            self.shiny_battle_start(u)
         if not u.active_passive():
             return
         p = u.param or 0
@@ -628,6 +642,14 @@ class Battle:
                 if top:
                     for u in units:
                         u.stats["damage"] = top.stats["damage"]
+
+    def shiny_battle_start(self, u: Unit) -> None:
+        """Shiny copies of monsters without a passive gain one (seen 2026-11-12 on the cards):
+        Magmite "On Battle Start: +10 Shield and +1 Burn permanently", Venopuff "+1 Poison" at
+        level 1 and "+2 Poison" at level 2 (so the numbers are taken to scale with the level)."""
+        lv = max(u.level, 1)
+        for stat, per_level in SHINY_BATTLE_START.get(u.base_name, {}).items():
+            u.stats[stat] += per_level * lv
 
     def start(self) -> None:
         for side in (0, 1):

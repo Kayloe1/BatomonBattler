@@ -310,3 +310,18 @@ class FromLogs(unittest.TestCase):
         self.assertEqual(cases[0]["result"], "loss")
         self.assertIn("opponent slot 1 not named", cases[0]["problems"])
         self.assertEqual(from_logs.check(cases)["skipped"], 1)
+
+
+class ShinyEffects(unittest.TestCase):
+    """What the Shiny cards said in the game (2026-11-12)."""
+
+    def test_shiny_stingarde_keeps_casting(self):
+        r = simulate(team([dict(mon("Stingarde"), shiny=True)]), EMPTY, until=18)
+        self.assertEqual(r.units[0][0]["triggered"], 3)
+        self.assertFalse(r.units[0][0].get("knocked_out"))
+
+    def test_shiny_battle_start_growth_scales_with_level(self):
+        a = team([dict(mon("Magmite"), shiny=True), dict(mon("Venopuff", 2), shiny=True)])
+        r = simulate(a, EMPTY, until=0.1)
+        self.assertEqual(r.units[0][0]["stats"]["shield"], 50)    # 40 + 10
+        self.assertEqual(r.units[0][1]["stats"]["poison"], 10)    # Lv2 8 + 2

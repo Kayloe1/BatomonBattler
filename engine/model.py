@@ -34,6 +34,7 @@ class Unit:
     paid: int = 0                                  # what the copies cost (sell value basis)
     sell_value: int | None = None                  # as read in game, when known
     copies: int = 1                                # Lv1 copies inside (1, 3, 6, ...)
+    shiny: bool = False                            # Shiny copy (reader: a "Name@shiny" sprite); see sim SHINY_*
 
     @property
     def species(self) -> data.Species | None:
@@ -220,8 +221,10 @@ def _merge(s: RunState, name: str) -> None:
                 stats["multicast"] = base.get("multicast", 1)
             else:
                 stats = parts[0][2].stat_dict()
+            # a Shiny copy keeps its Shiny through the merge (Venopuff, 2026-11-12)
             merged = Unit(name=name, level=new_level, paid=sum(p[2].paid for p in parts),
-                          copies=sum(p[2].copies for p in parts)).with_stats(stats)
+                          copies=sum(p[2].copies for p in parts),
+                          shiny=any(p[2].shiny for p in parts)).with_stats(stats)
             # lands in a team slot of one of the copies if any, else the first copy's slot
             target = next(((w, i) for w, i, _ in parts if w == TEAM), (parts[0][0], parts[0][1]))
             for w, i, _ in parts:
@@ -501,7 +504,7 @@ def unit_from_reader(slot: dict | None, price_hint: int | None = None) -> Unit |
         stats["multicast"] = sp.stats(level).get("multicast", 1)
     paid = price_hint if price_hint is not None else (sp.cost * data.COPIES_FOR_LEVEL.get(level, 1) if sp else 0)
     return Unit(name=name, level=level, paid=paid, sell_value=slot.get("sell_value"),
-                copies=data.COPIES_FOR_LEVEL.get(level, 1)).with_stats(stats)
+                copies=data.COPIES_FOR_LEVEL.get(level, 1), shiny=bool(slot.get("shiny"))).with_stats(stats)
 
 
 def card_from_reader(card: dict | None) -> Card | None:

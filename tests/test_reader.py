@@ -230,3 +230,24 @@ class CardSprites(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Shiny(unittest.TestCase):
+    """Shiny copies are told apart by their colour palette ("Name@shiny" sprite templates)."""
+
+    def _read(self, name):
+        path = CAPTURES / name
+        if not path.exists():
+            self.skipTest(f"captures/{name} not here")
+        return reader.read_state(Image.open(path).convert("RGB"))
+
+    def test_shiny_stingarde_and_magmite(self):
+        st = self._read("manual_shop_day5_shiny_magmite_bench2_fumungus_team0.png")
+        self.assertEqual((st["team"][2]["name"], st["team"][2].get("shiny")), ("Stingarde", True))
+        self.assertEqual((st["bench"][2]["name"], st["bench"][2].get("shiny")), ("Magmite", True))
+        self.assertFalse(st["team"][4].get("shiny"))          # a plain Magmite next to it
+
+    def test_plain_stingarde_is_not_shiny(self):
+        st = self._read("shop_r2_day3.png")
+        self.assertEqual(st["team"][4]["name"], "Stingarde")
+        self.assertFalse(st["team"][4].get("shiny"))

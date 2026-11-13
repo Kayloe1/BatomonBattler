@@ -683,9 +683,48 @@ def match_sprite(slot_rgb: np.ndarray) -> tuple[str | None, float]:
         return None, 1e9
     ranked = sorted(by_name.items(), key=lambda kv: kv[1])
     best, best_d = ranked[0]
-    if best_d > SPRITE_MATCH_MAX or (len(ranked) > 1 and best_d * 2 > ranked[1][1]):
+    # A Shiny copy has its own templates ("Name@shiny"); the "clearly better" test is only
+    # against other species, since a Shiny and a normal copy of one species look alike.
+    others = [d for n, d in ranked[1:] if species_of(n) != species_of(best)]
+    if best_d > SPRITE_MATCH_MAX or (others and best_d * 2 > others[0]):
         return None, best_d
+    sp = species_of(best)
+    if sp + SHINY_SUFFIX in by_name and sp in by_name:
+        # Shape says which species; colour says whether it is the Shiny palette. The mean pixel
+        # difference cannot tell (idle animation moves the sprite), a colour histogram can.
+        h = _colour_hist(patch)
+        d_norm = min(_hist_dist(h, _colour_hist(t)) for n, t in _sprite_templates()
+                     if n == sp and t.shape == patch.shape)
+        d_shiny = min(_hist_dist(h, _colour_hist(t)) for n, t in _sprite_templates()
+                      if n == sp + SHINY_SUFFIX and t.shape == patch.shape)
+        best = sp + SHINY_SUFFIX if d_shiny < d_norm else sp
+        best_d = by_name[best]
     return best, best_d
+
+
+def _colour_hist(patch: np.ndarray) -> np.ndarray:
+    """Coarse colour histogram of the sprite's pixels (white background and black outline left out)."""
+    px = patch.reshape(-1, 3).astype(int)
+    keep = (px.min(axis=1) < 225) & (px.max(axis=1) > 40)
+    px = px[keep] // 64
+    if len(px) == 0:
+        return np.zeros(64)
+    h = np.bincount(px[:, 0] * 16 + px[:, 1] * 4 + px[:, 2], minlength=64).astype(float)
+    return h / h.sum()
+
+
+def _hist_dist(a: np.ndarray, b: np.ndarray) -> float:
+    return float(np.abs(a - b).sum())
+
+
+SHINY_SUFFIX = "@shiny"
+
+
+def species_of(sprite_name: str | None) -> str | None:
+    """'Stingarde@shiny' -> 'Stingarde'."""
+    if sprite_name is None:
+        return None
+    return sprite_name[:-len(SHINY_SUFFIX)] if sprite_name.endswith(SHINY_SUFFIX) else sprite_name
 
 
 def learn_sprite(name: str, slot_rgb: np.ndarray) -> Path:
@@ -1118,7 +1157,11 @@ def _read_owned_slot(pic: np.ndarray, box: Box, where: str, problems: list[str])
     if any(b["value"] is None for b in badges):
         problems.append(f"{where}: cannot read a stat badge")
     name, dist = match_sprite(rgb)
-    return {"name": name, "level": level, "stats": badges, "sprite_distance": round(dist, 1) if dist < 1e8 else None}
+    slot = {"name": species_of(name), "level": level, "stats": badges,
+            "sprite_distance": round(dist, 1) if dist < 1e8 else None}
+    if name and name.endswith(SHINY_SUFFIX):
+        slot["shiny"] = True
+    return slot
 
 
 def _read_shop_slot(pic: np.ndarray, i: int, masks: dict, problems: list[str],
