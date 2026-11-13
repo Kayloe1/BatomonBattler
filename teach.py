@@ -208,6 +208,10 @@ LESSONS = [
             (1, 1): ["Dealt 154 damage", "Triggered 1 time(s)"],
         },
     },
+    {   # bot run 2026-11-12: trinket gift with "LOCKED BOX" (letters not seen in this font before)
+        "file": "captures/trinket_pick_20261112_210942.png",
+        "trinket_cards": ["MINI DUPLICATOR", "PLAIN LURE", "LOCKED BOX"],
+    },
 ]
 
 
@@ -269,6 +273,8 @@ def main() -> None:
                 store.teach(font, mask, truth)
         teach_stats(store, pic, lesson)
         teach_event(store, pic, lesson)
+        for i, name in enumerate(lesson.get("trinket_cards", [])):
+            store.teach("caps", reader.trinket_name_mask(pic, i), name)
         for i, name in enumerate(lesson.get("trainer_cards", [])):
             store.teach("caps", glyphs.white(reader.crop(pic, reader._trainer_card_name(i))), name)
         for i, digits in lesson.get("shop_badges", {}).items():

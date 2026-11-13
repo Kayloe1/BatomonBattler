@@ -446,22 +446,30 @@ def trinket_card(i: int) -> Box:
     return (250 + 720 * i, 330, 870 + 720 * i, 990)
 
 
+def trinket_name_mask(pic: np.ndarray, i: int) -> np.ndarray | None:
+    """White-letter mask of trinket card i's name (the header without the rarity); None if no card."""
+    x0 = 250 + 720 * i
+    if not _near(pic[345, x0 + 350], (255, 255, 255), 10):
+        return None                        # no card here
+    mask = glyphs.white(crop(pic, (x0 + 14, 266, x0 + 610, 320)))
+    gl = glyphs.segment(mask)
+    # header is "<NAME>      <RARITY>": keep what is left of the widest gap
+    cut = mask.shape[1]
+    if len(gl) > 1:
+        gap, k = max((gl[k + 1].x0 - gl[k].x1, k) for k in range(len(gl) - 1))
+        if gap >= 40:
+            cut = gl[k].x1 + 1
+    return mask[:, :cut]
+
+
 def read_trinket_pick(pic: np.ndarray) -> dict:
     """How many trinket cards are offered, and their names where readable."""
     names = []
     for i in range(3):
-        x0 = 250 + 720 * i
-        if not _near(pic[345, x0 + 350], (255, 255, 255), 10):
-            continue                       # no card here
-        mask = glyphs.white(crop(pic, (x0 + 14, 266, x0 + 610, 320)))
-        gl = glyphs.segment(mask)
-        # header is "<NAME>      <RARITY>": keep what is left of the widest gap
-        cut = mask.shape[1]
-        if len(gl) > 1:
-            gap, k = max((gl[k + 1].x0 - gl[k].x1, k) for k in range(len(gl) - 1))
-            if gap >= 40:
-                cut = gl[k].x1 + 1
-        text = store().read("caps", mask[:, :cut], space_gap=6)
+        mask = trinket_name_mask(pic, i)
+        if mask is None:
+            continue
+        text = store().read("caps", mask, space_gap=6)
         names.append(resolve(text, TRINKET_NAMES, ignore_case=True))
     return {"trinkets": names, "problems": [] if names else ["trinket pick: no cards found"]}
 
