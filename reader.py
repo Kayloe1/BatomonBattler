@@ -522,6 +522,15 @@ def detect_screen(pic: np.ndarray) -> str:
     return "unknown"
 
 
+def is_stats_window(pic: np.ndarray) -> bool:
+    """The Stats window, scrolled or not: its pink title and grey frame, which do not scroll.
+
+    detect_screen also checks the first yellow header at y=270, which scrolls out of view.
+    """
+    pts = [SCREENS["stats"][0], SCREENS["stats"][2]]
+    return all(_near(pic[y, x], colour, SCREEN_TOL) for x, y, colour in pts)
+
+
 # ---------------------------------------------------------- text regions ----
 
 def text_masks(pic: np.ndarray) -> dict[str, tuple[str, np.ndarray, dict]]:

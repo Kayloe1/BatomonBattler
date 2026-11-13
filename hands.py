@@ -105,8 +105,12 @@ def check_sell(before: dict, after: dict, src: tuple[str, int]) -> str | None:
         return f"screen became '{after.get('screen')}'"
     if _slots(after, src[0])[src[1]] is not None:
         return "slot is still occupied"
-    if after["money"] <= before["money"]:
-        return f"money did not go up ({before['money']} -> {after['money']})"
+    # a monster bought for $0 (Bug Catcher's first Bug of the day) sells for $0
+    # so equal money is fine as long as one monster really left (a mis-drag only moves it)
+    if after["money"] < before["money"]:
+        return f"money went down ({before['money']} -> {after['money']})"
+    if after["money"] == before["money"] and _owned_count(after) != _owned_count(before) - 1:
+        return f"money did not go up ({before['money']} -> {after['money']}) and no monster left"
     return None
 
 
@@ -486,9 +490,12 @@ class Hands:
             self._scroll(reader.STATS_SCROLL_POINT, -15)
             time.sleep(0.5)
             self.look(save_if_unreadable=False)
-            if reader.detect_screen(np.asarray(window.canonical_picture(self.last_image))) == "stats":
+            if reader.is_stats_window(np.asarray(window.canonical_picture(self.last_image))):
                 scrolled = self.last_image
                 scrolled.save(folder / f"{stamp}_stats_bottom.png")
+            else:
+                self.last_image.save(folder / f"{stamp}_stats_not_scrolled.png")
+                out["problems"].append("stats: the scrolled picture is not the Stats window")
         except Exception as e:
             out["problems"].append(f"stats: scrolling failed: {type(e).__name__}: {e}")
         try:

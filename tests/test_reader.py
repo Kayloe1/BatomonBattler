@@ -311,3 +311,4 @@ class CardSeven(unittest.TestCase):
         st = reader.read_state(Image.open(p))
         self.assertEqual(st["problems"], [])
         self.assertEqual([s["price"] for s in st["shop"]], [0, 12, 7, 12, 15])
+
