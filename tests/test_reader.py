@@ -267,3 +267,15 @@ class ShinyShopCards(unittest.TestCase):
             self.skipTest("captures/shop_r2_day3.png not here")
         st = reader.read_state(Image.open(path).convert("RGB"))
         self.assertFalse(any(c and c.get("shiny") for c in st["shop"]))
+
+
+class OverflowScreen(unittest.TestCase):
+    def test_overflow_screen(self):
+        path = CAPTURES / "stuck_20261112_211945.png"
+        if not path.exists():
+            self.skipTest("captures/stuck_20261112_211945.png not here")
+        st = reader.read_state(Image.open(path).convert("RGB"))
+        self.assertEqual(st["screen"], "overflow")
+        self.assertEqual([b["name"] for b in st["bench"]], ["Cicadence", "Cicadence", "Frizzly", "Frizzly"])
+        self.assertEqual(st["overflow"]["level"], 1)
+        self.assertEqual(st["problems"], [])

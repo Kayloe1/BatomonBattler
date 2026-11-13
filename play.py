@@ -366,6 +366,24 @@ def main(argv=None) -> int:
             log("confirm", ok=r.ok, message=r.message)
             if not r.ok:
                 return stop(f"after CONFIRM: {r.message} (capture: {(r.after or {}).get('saved_capture')})", r.after)
+        elif screen == "overflow":
+            # an event gave a monster with team and bench full: sell the weakest named bench monster,
+            # or the newcomer when nothing on the bench may be sold (unnamed monsters are never sold)
+            h.last_image.save(hands_mod.CAPTURE_DIR / f"overflow_{datetime.now():%Y%m%d_%H%M%S}.png")
+            from engine.arrange import power
+            from engine.model import unit_from_reader
+            named = [(power(unit_from_reader(s_)), i) for i, s_ in enumerate(state["bench"]) if s_ and s_.get("name")]
+            newcomer = state.get("overflow")
+            new_power = power(unit_from_reader(newcomer)) if newcomer and newcomer.get("name") else None
+            if named and (new_power is None or min(named)[0] <= new_power):
+                which, why = min(named)[1], "the weakest monster on the bench"
+            else:
+                which, why = "overflow", "nothing on the bench is weaker than the new monster"
+            r = h.resolve_overflow(which)
+            think([f"Team and bench are full: I sell {'bench slot ' + str(which + 1) if which != 'overflow' else 'the new monster'} ({why}). ({r.message})"])
+            log("overflow", sold=which, why=why, ok=r.ok, message=r.message)
+            if not r.ok:
+                return stop(f"overflow: {r.message} (capture: {(r.after or {}).get('saved_capture')})", r.after)
         elif screen == "event":
             h.last_image.save(hands_mod.CAPTURE_DIR / f"event_{datetime.now():%Y%m%d_%H%M%S}.png")
             effects = state.get("effects") or [None] * state["choices"]

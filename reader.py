@@ -138,6 +138,22 @@ SCREENS: dict[str, list[tuple[int, int, tuple[int, int, int]]]] = {
                (2530, 1420, (255, 255, 255))],
 }
 
+# "YOUR TEAM IS FULL. DRAG HERE TO SELL A MONSTER.": a monster given by an event while team and bench
+# are full waits in an OVERFLOW slot right of the team (the team grid moves left, the bench does not).
+# Selling any monster (drag onto the message box) moves it into the freed slot. Checked first: the
+# shop's own probes do not match this screen (the BATTLE! button is grey).
+SCREENS = {"overflow": [(1700, 655, (255, 189, 8)), (100, 1215, (90, 90, 99)), (2300, 1215, (90, 90, 99)),
+                        (1560, 650, (255, 255, 255))], **SCREENS}
+OVERFLOW_SLOT: Box = (1548, 710, 1788, 894)
+
+
+def read_overflow(pic: np.ndarray) -> dict:
+    """The bench (same place as on the shop) and the monster waiting in the OVERFLOW slot."""
+    problems: list[str] = []
+    bench = [_read_owned_slot(pic, bench_slot(i), f"bench {i}", problems) for i in range(BENCH_SLOTS)]
+    waiting = _read_owned_slot(pic, OVERFLOW_SLOT, "overflow", problems)
+    return {"bench": bench, "overflow": waiting, "problems": problems}
+
 FAST_FORWARD: Box = (1300, 15, 1420, 125)   # top centre of the battle screen; red when on
 
 
@@ -1352,6 +1368,8 @@ def read_state(image: Image.Image) -> dict:
         state.update(read_new_run(pic))
     elif state["screen"] == "event":
         state.update(read_event(pic))
+    elif state["screen"] == "overflow":
+        state.update(read_overflow(pic))
     else:
         state["problems"] = [f"screen '{state['screen']}' cannot be read yet"]
     size = window.crop_picture(image).size

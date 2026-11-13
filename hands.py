@@ -530,7 +530,7 @@ class Hands:
             return self._log(name, Result(False, "Confirm stayed grey after clicking the monster", before, state, clicks))
         if state.get("screen") == "select_target":
             clicks += self._click(reader.TARGET_CONFIRM)
-        wanted = {"shop", "event", "gift_box", "trinket_pick", "cash_in", "run_over"}
+        wanted = {"shop", "event", "gift_box", "trinket_pick", "cash_in", "run_over", "overflow"}
         after = self.wait_for(wanted, 40)
         return self._log(name, Result(after.get("screen") in wanted, f"now on '{after.get('screen')}'", before, after, clicks))
 
@@ -654,7 +654,27 @@ class Hands:
         if not 0 <= k < len(boxes):
             return self._log("event", Result(False, f"no choice {k} (there are {len(boxes)})", before))
         return self._press_and_wait(f"event choice {k}", "event", boxes[k],
-                                    {"shop", "event", "gift_box", "trinket_pick", "select_target", "cash_in"}, 40)
+                                    {"shop", "event", "gift_box", "trinket_pick", "select_target", "cash_in",
+                                     "overflow"}, 40)
+
+    def resolve_overflow(self, which: str | int) -> Result:
+        """On the OVERFLOW screen: sell bench monster `which` (0-3) or the waiting one ("overflow")."""
+        name = f"overflow: sell {which}"
+        before = self.look()
+        if before.get("screen") != "overflow":
+            return self._log(name, Result(False, f"not on the overflow screen ({before.get('screen')})", before))
+        if which == "overflow":
+            box = reader.OVERFLOW_SLOT
+        else:
+            if before["bench"][which] is None:
+                return self._log(name, Result(False, f"bench slot {which} is empty", before))
+            box = reader.bench_slot(which)
+        clicks = self._drag(box, reader.SELL_BAR)
+        if self.dry_run:
+            return self._log(name, Result(True, "dry run: nothing sent", before, None, clicks))
+        after = self.wait_for({"shop"}, 20)
+        return self._log(name, Result(after.get("screen") == "shop", f"now on '{after.get('screen')}'",
+                                      before, after, clicks))
 
 
 def reader_free_slots(state: dict) -> int:
