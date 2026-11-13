@@ -137,6 +137,8 @@ class Planning(unittest.TestCase):
                 s = model.reroll(s, rng)
             elif a.kind == "sell":
                 s = model.sell(s, *a.src)
+            elif a.kind == "item":           # rerolled shops can hold items (e.g. the Witch potions)
+                s = model.use_item(s, a.index, rng)
             else:
                 break
         self.assertGreaterEqual(len(s.owned()), 2)

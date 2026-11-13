@@ -259,6 +259,9 @@ def move(s: RunState, src: tuple[str, int], dst: tuple[str, int]) -> RunState:
 AVOID_ITEMS = {"Recombobulator", "Magic Lasso"}
 GIFT_ITEMS = {"Dowsing Rod": "Common", "Purple Gift": "Super Rare", "Golden Gift": "Legendary"}
 CANDIES = {"Basic Candy": ("Common", "Uncommon"), "Rare Candy": data.RARITIES}
+# Ultra Candy (Mythical, $60): "Level up a random level 3 monster" -> level 4
+CANDY_LEVEL = {"Basic Candy": 1, "Rare Candy": 1, "Ultra Candy": 3}
+CANDIES["Ultra Candy"] = data.RARITIES
 MAX_OUTCOMES = 6          # random items are scored on a sample of their possible results
 
 
@@ -281,7 +284,7 @@ def _level_up(u: Unit) -> Unit:
     """The unit one level higher, keeping what it grew (what a Candy does)."""
     sp = u.species
     new = u.level + 1
-    if sp is None or new > 3:
+    if sp is None or new > 4:            # candies and events go up to level 4 ("max level 4")
         return u
     base = sp.stats(new)
     grown = u.growth()
@@ -319,8 +322,8 @@ def item_outcomes(s: RunState, i: int) -> list[RunState]:
         t.items_left -= 1
         kinds = CANDIES[name]
         outs = []
-        for w, k, u in t.owned():
-            if u.level == 1 and u.species and u.species.rarity in kinds:
+        for w, k, u in t.owned():               # bench included (a Rare Candy hit the bench, 2026-11-12)
+            if u.level == CANDY_LEVEL[name] and u.species and u.species.rarity in kinds:
                 u2 = t.copy()
                 u2.set_slot(w, k, _level_up(u))
                 outs.append(u2)
@@ -353,13 +356,30 @@ def item_outcomes(s: RunState, i: int) -> list[RunState]:
         t.items_left -= 1
         t.gifts.append(GIFT_ITEMS[name])
         return [t]
+    # Witch potions (seen 2026-11-12)
+    if name == "Summon Potion":                 # a random level 2 Common, no sell value
+        t.items_left -= 1
+        outs = []
+        for sp in data.by_rarity("Common"):
+            u = t.copy()
+            if _add_unit(u, replace(new_unit(sp.name, 0, 2), sell_value=0)):
+                outs.append(u)
+        return outs
+    if name == "Shiny Potion":                  # a random monster (bench included) turns Shiny
+        t.items_left -= 1
+        outs = []
+        for w, k, u in t.owned():
+            u2 = t.copy()
+            u2.set_slot(w, k, replace(u, shiny=True))
+            outs.append(u2)
+        return outs
     return [use_item(s, i)]
 
 
 def use_item(s: RunState, i: int, rng: random.Random | None = None) -> RunState:
     card = s.shop[i]
     if card.name in ("Voucher", "Apex Bait", "Lootbox", "Recruiting Flyer", "Gold Powder", "Basic Candy",
-                     "Rare Candy") or card.name in GIFT_ITEMS:
+                     "Rare Candy", "Ultra Candy", "Summon Potion", "Shiny Potion") or card.name in GIFT_ITEMS:
         outs = item_outcomes(s, i)
         if not outs:                      # nothing to act on: the item is just spent
             t = s.copy()
@@ -400,6 +420,17 @@ def use_item(s: RunState, i: int, rng: random.Random | None = None) -> RunState:
     elif name == "Lucky Coin":
         t.money += 3
         t.items_left += 1
+    elif name == "Gold Potion":                 # "Gain $10"
+        t.money += 10
+    elif name == "Growth Potion":
+        # "Give each of your monsters a small amount of Damage, Poison or Burn" (bench too; patch 1.5:
+        # Damage 4-9, Poison/Burn 1-4). Modelled as the expectation over the three.
+        for w, k, u in owned:
+            d = u.stat_dict()
+            d["damage"] += 2
+            d["poison"] += 1
+            d["burn"] += 1
+            t.set_slot(w, k, u.with_stats(d))
     elif name == "Red Coin":
         t.money += 20
         t.lives -= 1
@@ -426,7 +457,8 @@ MODELLED_ITEMS = {"Cake", "Feast", "Pom Berry", "Coupon", "Fake Coin", "Lucky Co
                   "Tote Bag", "Nana Berry", "Focus Pill", "Green Stone", "Gray Ticket", "Green Ticket",
                   "Blue Ticket", "Purple Ticket", "Golden Ticket", "Coffee",
                   "Voucher", "Apex Bait", "Basic Candy", "Rare Candy", "Lootbox", "Recruiting Flyer",
-                  "Gold Powder", "Dowsing Rod", "Purple Gift", "Golden Gift"}
+                  "Gold Powder", "Dowsing Rod", "Purple Gift", "Golden Gift",
+                  "Ultra Candy", "Summon Potion", "Shiny Potion", "Gold Potion", "Growth Potion"}
 
 
 def item_is_worth_using(s: RunState, card: Card) -> bool:
