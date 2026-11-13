@@ -192,6 +192,26 @@ LESSONS = [
         "file": "captures/shop_day11_hp.png",
         "text": {"hp": "24900"},
     },
+    {   # bot run 2026-11-12: the third trainer card had letters not seen before
+        "file": "captures/trainer_pick_20261112_210240.png",
+        "trainer_cards": ["TREASURE HUNTER", "CHEMIST", "MASKED MAN"],
+    },
+    {   # bot run 2026-11-12, Stats window: digits 4 and 8 not seen before (the yellow Shock lines
+        # are not found as text bands, so those two cards are left out)
+        "file": "captures/battles/20261112_210418_stats_top.png",
+        "stats": {
+            (0, 0): ["Dealt 154 damage", "Triggered 1 time(s)"],
+            (0, 1): ["Dealt 69 damage", "Inflicted 28 Poison", "Triggered 7 time(s)"],
+            (0, 3): ["Dealt 80 damage", "Healed 90 HP", "Triggered 3 time(s)"],
+            (0, 4): ["Dealt 80 damage", "Healed 90 HP", "Triggered 3 time(s)"],
+            (0, 5): ["Dealt 154 damage", "Triggered 1 time(s)"],
+            (1, 1): ["Dealt 154 damage", "Triggered 1 time(s)"],
+        },
+    },
+    {   # bot run 2026-11-12: trinket gift with "LOCKED BOX" (letters not seen in this font before)
+        "file": "captures/trinket_pick_20261112_210942.png",
+        "trinket_cards": ["MINI DUPLICATOR", "PLAIN LURE", "LOCKED BOX"],
+    },
 ]
 
 
@@ -253,6 +273,8 @@ def main() -> None:
                 store.teach(font, mask, truth)
         teach_stats(store, pic, lesson)
         teach_event(store, pic, lesson)
+        for i, name in enumerate(lesson.get("trinket_cards", [])):
+            store.teach("caps", reader.trinket_name_mask(pic, i), name)
         for i, name in enumerate(lesson.get("trainer_cards", [])):
             store.teach("caps", glyphs.white(reader.crop(pic, reader._trainer_card_name(i))), name)
         for i, digits in lesson.get("shop_badges", {}).items():
@@ -261,7 +283,7 @@ def main() -> None:
             for i, (name, level, digits) in lesson.get(kind, {}).items():
                 x0, y0, x1, y1 = box_of(i)
                 rgb = pic[y0:y1, x0:x1]
-                store.add("level", level, glyphs.segment(reader.level_mask(rgb))[-1].bitmap)
+                store.add("level", level, glyphs.segment(reader.level_mask(rgb))[2].bitmap)
                 _teach_digits(store, "badge", reader.badge_digit_glyphs(pic, reader.owned_badge_band(box_of(i))),
                               digits, f"{kind} {i}")
                 reader.learn_sprite(name, rgb)

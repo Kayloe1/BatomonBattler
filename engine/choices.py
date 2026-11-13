@@ -73,6 +73,50 @@ def text_prior(name: str) -> float:
     return RARITY_PRIOR.get(t.get("rarity"), 0.0) + sum(v for w, v in _PRIOR_WORDS if w in effect)
 
 
+def _cooldown(u) -> float:
+    sp = u.species
+    return sp.level_cooldown.get(u.level, sp.cooldown) if sp else 0.0
+
+
+def with_trinket_stats(team: list, name: str, owned: list[str]) -> list:
+    """The team's badges as they would read once `name` is owned.
+
+    Live units carry the numbers on their badges, which already include the trinkets owned, so
+    the simulator does not apply trinket stat bonuses to them again. A trinket being considered
+    is therefore applied here, to the badges. Clubs stack additively (two Giant Clubs: x2.4)."""
+    out = []
+    for i, u in enumerate(team):
+        if u is None or u.species is None:
+            out.append(u)
+            continue
+        d = u.stat_dict()
+        types = u.species.types
+        if name == "Giant Club" and _cooldown(u) >= 5:
+            n = owned.count("Giant Club")
+            f = (1 + 0.7 * (n + 1)) / (1 + 0.7 * n)
+            d = {k: (v if k == "multicast" else round(v * f)) for k, v in d.items()}
+        elif name == "Small Club" and _cooldown(u) >= 5:
+            n = owned.count("Small Club")
+            d["damage"] = round(d["damage"] * (1 + 0.2 * (n + 1)) / (1 + 0.2 * n))
+        elif name == "Wood Sword":
+            d["damage"] += 5
+        elif name == "Warhorn":                 # +10 Damage every battle, permanently
+            d["damage"] += 10
+        elif name == "Power Crown" and i == 1:
+            d["damage"] += 20
+        elif name == "Fire Orb" and "Fire" in types:
+            d["burn"] += 3
+        elif name == "Poison Orb" and "Toxic" in types:
+            d["poison"] += 3
+        elif name == "Terrarium" and "Bug" in types:
+            d["damage"] = round(d["damage"] * 1.2)
+        out.append(u.with_stats(d))
+    return out
+
+
+_HP = re.compile(r"\+(\d+)(%?) HP")
+
+
 def pick_trinket(planner: Planner, s: RunState, offered: list[str | None]) -> tuple[int, str]:
     team, _ = planner.final_layout(s)
     k = planner.p.k_final
@@ -86,7 +130,11 @@ def pick_trinket(planner: Planner, s: RunState, offered: list[str | None]) -> tu
         effect = data.trinkets().get(name, {}).get("effect", "")
         t = s.copy()
         t.trinkets = s.trinkets + [name]
-        gain = planner.team_score(t, team, k) - base
+        hp = _HP.search(effect)                 # Training Weights, Barbell, the HP Charms
+        if hp and t.hp_today:
+            n = int(hp.group(1))
+            t.hp_today = int(t.hp_today * (1 + n / 100)) if hp.group(2) else t.hp_today + n
+        gain = planner.team_score(t, with_trinket_stats(team, name, s.trinkets), k) - base
         if not sim_knows(name):
             gain += text_prior(name)
         m = _INCOME.search(effect)

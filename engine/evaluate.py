@@ -33,6 +33,8 @@ def slot_spec(u: Unit | None) -> dict | None:
             "stats": {k: d[k] for k in ("damage", "heal", "shield", "poison", "burn", "shock")}}
     if d.get("multicast", 1) != 1:
         spec["multicast"] = d["multicast"]
+    if u.shiny:
+        spec["shiny"] = True
     return spec
 
 
@@ -43,7 +45,7 @@ def team_spec(team: list[Unit | None], hp: int, trainer: str | None = None,
 
 
 def team_key(team: list[Unit | None]) -> tuple:
-    return tuple((u.name, u.level, u.stats) if u else None for u in team)
+    return tuple((u.name, u.level, u.stats, u.shiny) if u else None for u in team)
 
 
 @dataclass

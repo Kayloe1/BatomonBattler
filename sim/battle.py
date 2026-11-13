@@ -14,7 +14,8 @@ A team is a dict (or the JSON form of one):
     }
 
 A slot's "stats" (the badges on the shop screen) replace the Batopedia numbers when given.
-Optional per-slot keys: "cooldown", "multicast", "speed" (% cooldown speed), "protect".
+Optional per-slot keys: "cooldown", "multicast", "speed" (% cooldown speed), "protect",
+"shiny" (true: a self-knockout monster keeps casting).
 
 `simulate(team_a, team_b)` plays the battle and returns a BattleResult. Rules and guesses are
 listed in sim/rules.py.
@@ -56,6 +57,7 @@ class Unit:
     alive: bool = True
     disabled: bool = False        # abilities disabled (Celestia)
     protect: int = 0
+    shiny: bool = False           # Shiny copy: the self-knockout drawback is gone (Stingarde, seen 2026-11-12)
     extra_multicast: int = 0
     shelldra_next: float = 4.0
     casts: int = 0
@@ -111,6 +113,7 @@ class Trainer:
     poison: float = 0.0
     burn: float = 0.0
     shock: float = 0.0
+    shock_pending: float = 0.0    # Shock gained this instant; it boosts hits only from the next instant on
     heal_mult: float = 1.0
     shield_mult: float = 1.0
     link_cable: bool = False
@@ -133,6 +136,20 @@ class BattleResult:
                 "statuses": list(self.statuses), "units": list(self.units)}
 
 
+# What a Shiny copy changes, from the cards seen in the game (2026-11-12). Each species changes
+# something different; species not listed here are simulated like the normal card.
+#  - self-knockout monsters keep casting (Shiny Stingarde's card has no "Knockout self"; Electranade
+#    and Pyronade are assumed to work the same way)
+#  - monsters without a passive gain a small permanent growth at battle start
+#  - Stalagrove's 15% became 18% (x1.2 on its parameter)
+#  - other numbers go up by about 20%: Cobrex Poison 300 -> 360 (on the badge, so already read),
+#    Geminiss +50% -> +60% Shield, Blixie gives 1.2x its Burn instead of 1x, Torrantler's
+#    cooldown 7 -> 5.5 s (cards seen through a Glimmer Potion)
+SHINY_BATTLE_START = {"Magmite": {"shield": 10, "burn": 1}, "Venopuff": {"poison": 1}}
+SHINY_PARAM_MULT = {"Stalagrove": 1.2, "Geminiss": 1.2, "Blixie": 1.2}
+SHINY_COOLDOWN_MULT = {"Torrantler": 5.5 / 7.0}
+
+
 def build_unit(side: int, slot: int, spec: dict, trainer: str | None, trinkets: list[str]) -> Unit:
     name = spec["name"]
     level = int(spec.get("level", 1))
@@ -147,7 +164,12 @@ def build_unit(side: int, slot: int, spec: dict, trainer: str | None, trinkets: 
     unit = Unit(side, slot, name, level, types, sp.rarity, float(spec.get("cooldown", lv.cooldown)),
                 stats, multicast, lv.passive_text if level > 1 else sp.passive, lv.param,
                 sp.is_ongoing, sp.has_ability() and not (sp.name in data.EVOLVES and level < 3),
-                speed=float(spec.get("speed", 0)), protect=int(spec.get("protect", 0)))
+                speed=float(spec.get("speed", 0)), protect=int(spec.get("protect", 0)),
+                shiny=bool(spec.get("shiny", False)))
+    if unit.shiny and unit.param and sp.name in SHINY_PARAM_MULT:
+        unit.param *= SHINY_PARAM_MULT[sp.name]
+    if unit.shiny and sp.name in SHINY_COOLDOWN_MULT and "cooldown" not in spec:
+        unit.cooldown *= SHINY_COOLDOWN_MULT[sp.name]
     # Trainer / trinket bonuses that the badges would already show.
     if not given:
         if trainer == "Chef":
@@ -168,11 +190,15 @@ def build_unit(side: int, slot: int, spec: dict, trainer: str | None, trinkets: 
                 unit.stats["damage"] += 20
             elif t == "Terrarium" and "Bug" in unit.types:
                 unit.stats["damage"] *= 1.2
-            elif t == "Small Club" and unit.cooldown >= 5:
-                unit.stats["damage"] *= 1.2
-            elif t == "Giant Club" and unit.cooldown >= 5:
+        # Clubs stack additively: two Giant Clubs gave x2.4, not x1.7^2 (Cobrex Lv2 Shiny: 600 x 1.2 x 2.4
+        # = 1728 on its card, 2026-11-12). Small Club is assumed to stack the same way.
+        if unit.cooldown >= 5:
+            n_small, n_giant = trinkets.count("Small Club"), trinkets.count("Giant Club")
+            if n_small:
+                unit.stats["damage"] *= 1 + 0.2 * n_small
+            if n_giant:
                 for s in data.STATS:
-                    unit.stats[s] *= 1.7
+                    unit.stats[s] *= 1 + 0.7 * n_giant
     elif trainer == "Chef" and len(types) == 1 and "Fire" not in types:
         unit.types.append("Fire")
     # Cooldown and Multicast bonuses (not visible on badges).
@@ -323,7 +349,9 @@ class Battle:
         elif u.is_("Fumungus"):
             dmg += u.param / 100.0 * k * self.trainers[1 - u.side].poison
         elif u.is_("Gaiadrasil"):
-            dmg += u.param / 100.0 * k * sum(v.stats["damage"] for v in self.adjacent(u)
+            # allies' full Damage, Ongoing extras included (Fumungus's Poison-based Damage counted
+            # in the game: one cast hit 3375 where the allies' badges summed to ~2450, 2026-11-12)
+            dmg += u.param / 100.0 * k * sum(self.damage_of(v) for v in self.adjacent(u)
                                             if not v.is_("Gaiadrasil") and v.alive)
         return dmg
 
@@ -370,6 +398,8 @@ class Battle:
         target.hp -= amount - absorbed
 
     def heal(self, tr: Trainer, amount: float) -> None:
+        if tr.hp <= EPS and not self.immortal:
+            return                   # a trainer at 0 HP is out; a heal later in the same instant cannot revive it
         amount *= tr.heal_mult
         tr.hp += amount
         if SETTINGS["heal_cap"]:
@@ -413,12 +443,11 @@ class Battle:
         me, foe = self.trainers[u.side], self.trainers[1 - u.side]
         mc = self.multicast_of(u)
         u.casts += 1
+        u.triggers += 1          # the Stats screen counts casts, not Multicast hits (Velocect x2: 4 casts = "4 times")
         for _ in range(mc):
-            u.triggers += 1
             dmg = self.damage_of(u)
             if dmg > 0:
-                self.hit(foe, dmg, u)
-                u.dealt += dmg
+                u.dealt += self.hit(foe, dmg, u)   # "Dealt" on the Stats screen includes the Shock bonus
             if u.stats["heal"] > 0:
                 self.heal(me, u.stats["heal"])
                 u.healed += u.stats["heal"]
@@ -434,7 +463,10 @@ class Battle:
                 u.inflicted["burn"] += u.stats["burn"]
             shock = self.shock_of(u)
             if shock > 0:
-                foe.shock += shock
+                if SETTINGS.get("shock_next_instant", True):
+                    foe.shock_pending += shock
+                else:
+                    foe.shock += shock
                 u.inflicted["shock"] += shock
                 self.on_ally_inflicts(u, "shock")
         if self.verbose:
@@ -470,7 +502,8 @@ class Battle:
         elif name == "Pebbler":
             u.stats["shield"] += p
         elif name in ("Stingarde", "Electranade", "Pyronade"):
-            self.knockout(u)
+            if not u.shiny:          # a Shiny copy keeps casting (Shiny Stingarde: 3 casts, 450 damage)
+                self.knockout(u)
         elif name == "Boomagon":
             b = self.behind(u)
             if b:
@@ -564,6 +597,8 @@ class Battle:
 
     # ---------- battle start ----------
     def battle_start(self, u: Unit) -> None:
+        if u.shiny:
+            self.shiny_battle_start(u)
         if not u.active_passive():
             return
         p = u.param or 0
@@ -619,6 +654,14 @@ class Battle:
                 if top:
                     for u in units:
                         u.stats["damage"] = top.stats["damage"]
+
+    def shiny_battle_start(self, u: Unit) -> None:
+        """Shiny copies of monsters without a passive gain one (seen 2026-11-12 on the cards):
+        Magmite "On Battle Start: +10 Shield and +1 Burn permanently", Venopuff "+1 Poison" at
+        level 1 and "+2 Poison" at level 2 (so the numbers are taken to scale with the level)."""
+        lv = max(u.level, 1)
+        for stat, per_level in SHINY_BATTLE_START.get(u.base_name, {}).items():
+            u.stats[stat] += per_level * lv
 
     def start(self) -> None:
         for side in (0, 1):
@@ -681,10 +724,16 @@ class Battle:
                             u.progress = min(u.progress, u.cooldown)
                             self.cast(u)
                             ready = True
-                            if not self.immortal and any(self.dead()):
+                            if (not self.immortal and not SETTINGS.get("deaths_after_instant", True)
+                                    and any(self.dead())):
                                 return self._result()
                 if not ready:
                     break
+            for tr in self.trainers:
+                tr.shock += tr.shock_pending
+                tr.shock_pending = 0.0
+            if not self.immortal and any(self.dead()):
+                return self._result()
             for side in (0, 1):
                 for u in self.living(side):
                     if u.is_("Shelldra") and u.active_passive() and u.shelldra_next <= self.t + EPS:

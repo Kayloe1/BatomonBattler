@@ -138,6 +138,22 @@ SCREENS: dict[str, list[tuple[int, int, tuple[int, int, int]]]] = {
                (2530, 1420, (255, 255, 255))],
 }
 
+# "YOUR TEAM IS FULL. DRAG HERE TO SELL A MONSTER.": a monster given by an event while team and bench
+# are full waits in an OVERFLOW slot right of the team (the team grid moves left, the bench does not).
+# Selling any monster (drag onto the message box) moves it into the freed slot. Checked first: the
+# shop's own probes do not match this screen (the BATTLE! button is grey).
+SCREENS = {"overflow": [(1700, 655, (255, 189, 8)), (100, 1215, (90, 90, 99)), (2300, 1215, (90, 90, 99)),
+                        (1560, 650, (255, 255, 255))], **SCREENS}
+OVERFLOW_SLOT: Box = (1548, 710, 1788, 894)
+
+
+def read_overflow(pic: np.ndarray) -> dict:
+    """The bench (same place as on the shop) and the monster waiting in the OVERFLOW slot."""
+    problems: list[str] = []
+    bench = [_read_owned_slot(pic, bench_slot(i), f"bench {i}", problems) for i in range(BENCH_SLOTS)]
+    waiting = _read_owned_slot(pic, OVERFLOW_SLOT, "overflow", problems)
+    return {"bench": bench, "overflow": waiting, "problems": problems}
+
 FAST_FORWARD: Box = (1300, 15, 1420, 125)   # top centre of the battle screen; red when on
 
 
@@ -303,6 +319,9 @@ SPRITE_MATCH_MAX = 45.0     # mean colour difference allowed for a sprite match
 
 _names = json.loads((ROOT / "data" / "names.json").read_text(encoding="utf-8"))
 MONSTER_NAMES: list[str] = list(_names["pantra_batomon_base_price"]) + list(_names["evolved_forms_seen"])
+if (ROOT / "data" / "foreign_monsters.csv").exists():          # event-given monsters of another region
+    with open(ROOT / "data" / "foreign_monsters.csv", newline="", encoding="utf-8") as _f:
+        MONSTER_NAMES += [row["name"] for row in csv.DictReader(_f)]
 ITEM_NAMES: list[str] = list(_names["items"])
 with open(ROOT / "data" / "trainers.csv", newline="", encoding="utf-8") as _f:
     TRAINER_NAMES: list[str] = [row["name"] for row in csv.DictReader(_f)]
@@ -443,22 +462,30 @@ def trinket_card(i: int) -> Box:
     return (250 + 720 * i, 330, 870 + 720 * i, 990)
 
 
+def trinket_name_mask(pic: np.ndarray, i: int) -> np.ndarray | None:
+    """White-letter mask of trinket card i's name (the header without the rarity); None if no card."""
+    x0 = 250 + 720 * i
+    if not _near(pic[345, x0 + 350], (255, 255, 255), 10):
+        return None                        # no card here
+    mask = glyphs.white(crop(pic, (x0 + 14, 266, x0 + 610, 320)))
+    gl = glyphs.segment(mask)
+    # header is "<NAME>      <RARITY>": keep what is left of the widest gap
+    cut = mask.shape[1]
+    if len(gl) > 1:
+        gap, k = max((gl[k + 1].x0 - gl[k].x1, k) for k in range(len(gl) - 1))
+        if gap >= 40:
+            cut = gl[k].x1 + 1
+    return mask[:, :cut]
+
+
 def read_trinket_pick(pic: np.ndarray) -> dict:
     """How many trinket cards are offered, and their names where readable."""
     names = []
     for i in range(3):
-        x0 = 250 + 720 * i
-        if not _near(pic[345, x0 + 350], (255, 255, 255), 10):
-            continue                       # no card here
-        mask = glyphs.white(crop(pic, (x0 + 14, 266, x0 + 610, 320)))
-        gl = glyphs.segment(mask)
-        # header is "<NAME>      <RARITY>": keep what is left of the widest gap
-        cut = mask.shape[1]
-        if len(gl) > 1:
-            gap, k = max((gl[k + 1].x0 - gl[k].x1, k) for k in range(len(gl) - 1))
-            if gap >= 40:
-                cut = gl[k].x1 + 1
-        text = store().read("caps", mask[:, :cut], space_gap=6)
+        mask = trinket_name_mask(pic, i)
+        if mask is None:
+            continue
+        text = store().read("caps", mask, space_gap=6)
         names.append(resolve(text, TRINKET_NAMES, ignore_case=True))
     return {"trinkets": names, "problems": [] if names else ["trinket pick: no cards found"]}
 
@@ -683,9 +710,51 @@ def match_sprite(slot_rgb: np.ndarray) -> tuple[str | None, float]:
         return None, 1e9
     ranked = sorted(by_name.items(), key=lambda kv: kv[1])
     best, best_d = ranked[0]
-    if best_d > SPRITE_MATCH_MAX or (len(ranked) > 1 and best_d * 2 > ranked[1][1]):
+    # A Shiny copy has its own templates ("Name@shiny"); the "clearly better" test is only
+    # against other species, since a Shiny and a normal copy of one species look alike.
+    others = [d for n, d in ranked[1:] if species_of(n) != species_of(best)]
+    if best_d > SPRITE_MATCH_MAX or (others and best_d * 2 > others[0]):
         return None, best_d
+    sp = species_of(best)
+    if sp + SHINY_SUFFIX in by_name and sp in by_name:
+        # Shape says which species; colour says whether it is the Shiny palette. The mean pixel
+        # difference cannot tell (idle animation moves the sprite), a colour histogram can.
+        h = _colour_hist(patch)
+        d_norm = min(_hist_dist(h, _colour_hist(t)) for n, t in _sprite_templates()
+                     if n == sp and t.shape == patch.shape)
+        d_shiny = min(_hist_dist(h, _colour_hist(t)) for n, t in _sprite_templates()
+                      if n == sp + SHINY_SUFFIX and t.shape == patch.shape)
+        best = sp + SHINY_SUFFIX if d_shiny < d_norm else sp
+        best_d = by_name[best]
     return best, best_d
+
+
+def _colour_hist(patch: np.ndarray) -> np.ndarray:
+    """Coarse colour histogram of the sprite's pixels (white background and black outline left out)."""
+    px = patch.reshape(-1, 3).astype(int)
+    keep = (px.min(axis=1) < 225) & (px.max(axis=1) > 40)
+    px = px[keep] // 64
+    if len(px) == 0:
+        return np.zeros(64)
+    h = np.bincount(px[:, 0] * 16 + px[:, 1] * 4 + px[:, 2], minlength=64).astype(float)
+    return h / h.sum()
+
+
+def _hist_dist(a: np.ndarray, b: np.ndarray) -> float:
+    return float(np.abs(a - b).sum())
+
+
+SHINY_SUFFIX = "@shiny"
+# Sprites used only for team/bench slots: the Egg Breeder's Purple Egg matched the Dragon Egg on the
+# battle field, and the two eggs do the same thing in battle (nothing).
+OWNED_ONLY_SPRITES = {"Purple Egg"}
+
+
+def species_of(sprite_name: str | None) -> str | None:
+    """'Stingarde@shiny' -> 'Stingarde'."""
+    if sprite_name is None:
+        return None
+    return sprite_name[:-len(SHINY_SUFFIX)] if sprite_name.endswith(SHINY_SUFFIX) else sprite_name
 
 
 def learn_sprite(name: str, slot_rgb: np.ndarray) -> Path:
@@ -767,6 +836,8 @@ def learn_card_sprites(pic: np.ndarray, state: dict) -> list[Path]:
     for i, card in enumerate(state.get("shop") or []):
         if not card or card.get("kind") != "monster" or not card.get("name"):
             continue
+        if card.get("shiny"):
+            continue                      # a Shiny palette would teach a wrong colour for the species
         name = card["name"]
         have = list(CARD_SPRITE_DIR.glob(f"{name}.png")) + list(CARD_SPRITE_DIR.glob(f"{name}__*.png"))
         if len(have) >= CARD_SPRITES_PER_NAME:
@@ -805,6 +876,8 @@ def _battle_templates() -> list[tuple[str, np.ndarray, np.ndarray]]:
     if _battle_tpls is None:
         _battle_tpls = []
         for name, tpl in _sprite_templates():
+            if name.endswith(SHINY_SUFFIX) or name in OWNED_ONLY_SPRITES:
+                continue              # battle logs use species names; eggs look alike on the field
             mask = np.abs(tpl.astype(int) - 255).sum(axis=2) > 60
             if mask.sum() >= 50:
                 _battle_tpls.append((name, tpl, mask))
@@ -851,7 +924,8 @@ def _read_battle_slot(pic: np.ndarray, side: int, i: int, problems: list[str]) -
         return None                       # no "LV." label: empty slot
     where = f"{'my' if side == 0 else 'opponent'} slot {i}"
     parts = glyphs.segment(fill)
-    level_text = store().classify("level", parts[-1].bitmap)[0] if len(parts) >= 3 else ""
+    # "LV", ".", digit: the digit is the third piece (a sprite pixel of the label colour can follow it)
+    level_text = store().classify("level", parts[2].bitmap)[0] if len(parts) >= 3 else ""
     level = _to_int(level_text)
     if level is None:
         problems.append(f"{where}: cannot read level ('{level_text}')")
@@ -1110,7 +1184,8 @@ def _read_owned_slot(pic: np.ndarray, box: Box, where: str, problems: list[str])
     # "LV. n" label, top left: coloured letters with a black outline
     fill = level_mask(rgb)
     parts = glyphs.segment(fill)          # "LV", ".", digit
-    level_text = store().classify("level", parts[-1].bitmap)[0] if len(parts) >= 3 else ""
+    # "LV", ".", digit: the digit is the third piece (a sprite pixel of the label colour can follow it)
+    level_text = store().classify("level", parts[2].bitmap)[0] if len(parts) >= 3 else ""
     level = _to_int(level_text)
     if level is None:
         problems.append(f"{where}: cannot read level ('{level_text}')")
@@ -1118,7 +1193,11 @@ def _read_owned_slot(pic: np.ndarray, box: Box, where: str, problems: list[str])
     if any(b["value"] is None for b in badges):
         problems.append(f"{where}: cannot read a stat badge")
     name, dist = match_sprite(rgb)
-    return {"name": name, "level": level, "stats": badges, "sprite_distance": round(dist, 1) if dist < 1e8 else None}
+    slot = {"name": species_of(name), "level": level, "stats": badges,
+            "sprite_distance": round(dist, 1) if dist < 1e8 else None}
+    if name and name.endswith(SHINY_SUFFIX):
+        slot["shiny"] = True
+    return slot
 
 
 def _read_shop_slot(pic: np.ndarray, i: int, masks: dict, problems: list[str],
@@ -1159,8 +1238,30 @@ def _read_shop_slot(pic: np.ndarray, i: int, masks: dict, problems: list[str],
     frame = pic[1300, 507 + 312 * i]
     rarity = next((r for r, c in FRAME_RARITY.items() if _near(frame, c, 20)), None)
     greyed = bool(_near(text_rgb, CARD_GREY, 4).sum() >= 300)
-    return {"name": name, "price": price, "kind": kind, "stats": stats,
+    card = {"name": name, "price": price, "kind": kind, "stats": stats,
             "rarity": rarity, "greyed": greyed, "raw": raw_name}
+    if kind == "monster" and shiny_tag_score(pic, i) >= SHINY_TAG_MIN:
+        card["shiny"] = True
+    return card
+
+
+# A Shiny shop card has a pastel "SHINY" word with a thick black outline at its top right. Its
+# outline mask (cut from captures/manual_shop_glimmer_all_shiny_cards.png) scores 0.95-1.0 on
+# Shiny cards and at most 0.23 on the plain cards of 50+ saved shop captures.
+SHINY_TAG_MIN = 0.6
+_shiny_tag: np.ndarray | None = None
+
+
+def shiny_tag_score(pic: np.ndarray, i: int) -> float:
+    global _shiny_tag
+    if _shiny_tag is None:
+        _shiny_tag = (np.asarray(Image.open(ROOT / "templates" / "shiny_tag.png")) > 127).astype(np.float32)
+    x0 = shop_card(i)[0]
+    region = pic[1152:1230, x0 + 142:x0 + 318]
+    dark = (region.max(axis=2) < 60).astype(np.float32)
+    if dark.shape[0] < _shiny_tag.shape[0] or dark.shape[1] < _shiny_tag.shape[1] or dark.sum() == 0:
+        return 0.0
+    return float(cv2.matchTemplate(dark, _shiny_tag, cv2.TM_CCOEFF_NORMED).max())
 
 
 # ------------------------------------------------------------- shop read ----
@@ -1267,6 +1368,8 @@ def read_state(image: Image.Image) -> dict:
         state.update(read_new_run(pic))
     elif state["screen"] == "event":
         state.update(read_event(pic))
+    elif state["screen"] == "overflow":
+        state.update(read_overflow(pic))
     else:
         state["problems"] = [f"screen '{state['screen']}' cannot be read yet"]
     size = window.crop_picture(image).size

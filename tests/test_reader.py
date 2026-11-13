@@ -230,3 +230,52 @@ class CardSprites(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Shiny(unittest.TestCase):
+    """Shiny copies are told apart by their colour palette ("Name@shiny" sprite templates)."""
+
+    def _read(self, name):
+        path = CAPTURES / name
+        if not path.exists():
+            self.skipTest(f"captures/{name} not here")
+        return reader.read_state(Image.open(path).convert("RGB"))
+
+    def test_shiny_stingarde_and_magmite(self):
+        st = self._read("manual_shop_day5_shiny_magmite_bench2_fumungus_team0.png")
+        self.assertEqual((st["team"][2]["name"], st["team"][2].get("shiny")), ("Stingarde", True))
+        self.assertEqual((st["bench"][2]["name"], st["bench"][2].get("shiny")), ("Magmite", True))
+        self.assertFalse(st["team"][4].get("shiny"))          # a plain Magmite next to it
+
+    def test_plain_stingarde_is_not_shiny(self):
+        st = self._read("shop_r2_day3.png")
+        self.assertEqual(st["team"][4]["name"], "Stingarde")
+        self.assertFalse(st["team"][4].get("shiny"))
+
+
+class ShinyShopCards(unittest.TestCase):
+    def test_glimmer_shop_cards_are_shiny(self):
+        path = CAPTURES / "manual_shop_glimmer_all_shiny_cards.png"
+        if not path.exists():
+            self.skipTest("captures/manual_shop_glimmer_all_shiny_cards.png not here")
+        st = reader.read_state(Image.open(path).convert("RGB"))
+        self.assertEqual([bool(c and c.get("shiny")) for c in st["shop"]], [True, False, True, True, True])
+
+    def test_plain_shop_cards_are_not_shiny(self):
+        path = CAPTURES / "shop_r2_day3.png"
+        if not path.exists():
+            self.skipTest("captures/shop_r2_day3.png not here")
+        st = reader.read_state(Image.open(path).convert("RGB"))
+        self.assertFalse(any(c and c.get("shiny") for c in st["shop"]))
+
+
+class OverflowScreen(unittest.TestCase):
+    def test_overflow_screen(self):
+        path = CAPTURES / "stuck_20261112_211945.png"
+        if not path.exists():
+            self.skipTest("captures/stuck_20261112_211945.png not here")
+        st = reader.read_state(Image.open(path).convert("RGB"))
+        self.assertEqual(st["screen"], "overflow")
+        self.assertEqual([b["name"] for b in st["bench"]], ["Cicadence", "Cicadence", "Frizzly", "Frizzly"])
+        self.assertEqual(st["overflow"]["level"], 1)
+        self.assertEqual(st["problems"], [])

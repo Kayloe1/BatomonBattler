@@ -79,6 +79,11 @@ def _level_up(u):
     return model.replace(u.with_stats(d), level=u.level + 1)
 
 
+def _make_shiny(u):
+    """The same monster as a Shiny copy (what Shiny changes is in sim.battle SHINY_*)."""
+    return None if u.shiny or u.species is None else model.replace(u, shiny=True)
+
+
 def _best_single_change_unit(planner: Planner, s: RunState, change):
     """(gain, unit) of the owned monster that gains most from change(unit); (0.0, None) if none does."""
     best, who = 0.0, None
@@ -119,6 +124,9 @@ def best_target(planner: Planner, s: RunState, effect: str | None):
     if _has(effect, "Level up a monster"):
         _, unit = _best_single_change_unit(planner, s, _level_up)
         why = "levelling it improves the simulated battles most"
+    elif _has(effect, "SHINY"):
+        _, unit = _best_single_change_unit(planner, s, _make_shiny)
+        why = "its Shiny effect improves the simulated battles most"
     else:
         m = re.search(r"\+(\d+) Shock", effect)
         if m:
@@ -169,6 +177,23 @@ def score_effect(planner: Planner, s: RunState, effect: str) -> tuple[float, str
         if who:
             return g, f"levelling {who} improves the simulated battles most", False
         return 0.0, "no monster to level", False
+    if _has(effect, "Turn a monster SHINY"):
+        g, who = _best_single_change(planner, s, _make_shiny)
+        if who:
+            return g, f"a Shiny {who} improves the simulated battles most", False
+        return 0.0, "no monster gains from Shiny in the simulator", False
+    if _has(effect, "Mysterious Charm"):
+        # "[Unique] +25% HP" (seen on the last-life rescue, 2026-11-12)
+        if "Mysterious Charm" in s.trinkets:
+            return 0.0, "the Mysterious Charm is unique and I already have it", False
+        t = s.copy()
+        t.trinkets = s.trinkets + ["Mysterious Charm"]
+        if s.hp_today:
+            t.hp_today = int(s.hp_today * 1.25)
+        team, _ = planner.final_layout(s)
+        k = planner.p.k_final
+        return (planner.team_score(t, team, k) - planner.team_score(s, team, k),
+                "Mysterious Charm (+25% HP) in the simulator", False)
     m = re.search(r"\+(\d+) Shock", effect)
     if m:
         n = int(m.group(1))
@@ -203,11 +228,17 @@ def score_effect(planner: Planner, s: RunState, effect: str) -> tuple[float, str
             return 0.0, "the egg does nothing in battle until it hatches", False
         trinket = next((n for n in data.trinkets() if _key(n) == _key(name)), None)
         if trinket:
+            from .choices import _HP, with_trinket_stats
             t = s.copy()
             t.trinkets = s.trinkets + [trinket]
+            hp = _HP.search(data.trinkets()[trinket].get("effect", ""))
+            if hp and t.hp_today:                 # Dryad's Charm, Mysterious Charm, Barbell...
+                n = int(hp.group(1))
+                t.hp_today = int(t.hp_today * (1 + n / 100)) if hp.group(2) else t.hp_today + n
             team, _ = planner.final_layout(s)
             k = planner.p.k_final
-            return planner.team_score(t, team, k) - planner.team_score(s, team, k), f"trinket {trinket} in the simulator", False
+            return (planner.team_score(t, with_trinket_stats(team, trinket, s.trinkets), k)
+                    - planner.team_score(s, team, k)), f"trinket {trinket} in the simulator", False
         return UNKNOWN_GAIN, f"'{name}' is not in my data yet, so a small fixed guess", True
     return UNKNOWN_GAIN, "an effect I cannot model yet, so a small fixed guess", True
 

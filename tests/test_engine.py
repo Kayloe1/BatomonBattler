@@ -26,7 +26,8 @@ def small_planner():
 class Data(unittest.TestCase):
     def test_roster(self):
         r = data.roster()
-        self.assertEqual(len(r), 64)
+        self.assertEqual(len([n for n, sp in r.items() if not sp.foreign]), 64)   # Pantra
+        self.assertTrue(r["Rhizuka"].foreign)
         self.assertEqual(r["Guardiant"].bug_growth[1], 8)
         self.assertTrue(r["Stingarde"].self_ko)
         self.assertTrue(r["Panbud"].evolves)
@@ -137,6 +138,8 @@ class Planning(unittest.TestCase):
                 s = model.reroll(s, rng)
             elif a.kind == "sell":
                 s = model.sell(s, *a.src)
+            elif a.kind == "item":           # rerolled shops can hold items (e.g. the Witch potions)
+                s = model.use_item(s, a.index, rng)
             else:
                 break
         self.assertGreaterEqual(len(s.owned()), 2)
@@ -392,3 +395,22 @@ class WastefulPlay(unittest.TestCase):
         self.assertEqual((s.bought, s.rerolls), (["Velocect"], 1))
         s2 = model.from_reader({**st, "day": 4, "team": [None] * 6, "bench": [None] * 4, "money": 5}, b.memory)
         self.assertEqual((s2.bought, s2.rerolls), ([], 0))
+
+
+class TrinketStatsOnBadges(unittest.TestCase):
+    def test_giant_club_scales_badges_additively(self):
+        from engine.choices import with_trinket_stats
+        u = new_unit("Cobrex", 50)                      # 15 s cooldown: qualifies
+        one = with_trinket_stats([u], "Giant Club", [])[0]
+        self.assertEqual(one.stat("poison"), round(300 * 1.7))
+        two = with_trinket_stats([one], "Giant Club", ["Giant Club"])[0]
+        self.assertAlmostEqual(two.stat("poison"), 300 * 2.4, delta=2)
+        fast = with_trinket_stats([new_unit("Venopuff", 15)], "Giant Club", [])[0]
+        self.assertEqual(fast.stat("poison"), 4)        # 3.5 s cooldown: no bonus
+
+
+class ShinyCards(unittest.TestCase):
+    def test_buying_a_shiny_card_gives_a_shiny_unit(self):
+        s = RunState(day=3, money=30, shop=[model.Card("Stingarde", 10, "monster", shiny=True), None, None, None, None])
+        t = model.buy(s, 0)
+        self.assertTrue(any(u.shiny for _, _, u in t.owned()))

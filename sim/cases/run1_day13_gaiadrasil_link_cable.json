@@ -1,0 +1,30 @@
+{
+  "title": "Egg Breeder run, Day 13 (2026-11-12 night): Link Cable + two Gaiadrasils, our side only",
+  "sources": "Stats screen read by eye. The opponent (Burn team, 3 trinkets) killed us at ~14 s; only our side's numbers are checked, against an empty opponent with the battle cut at 14 s. Game: Fumungus 2879 (5 casts), Gaiadrasil 3375 and 3385 (1 cast each), Noxalith 110 (2), Saberhorn 120 (1), Thorntail 7026 (2). Fumungus's starting Poison (81) is a guess between the shop's 78 and the end's 90. The sim gives 2969 / 3396 / 3396 / 110 / 120 / 6968; only the exact matches are checked.",
+  "a": {
+    "trainer": "Egg Breeder", "hp": 59125,
+    "trinkets": ["Haste Orb", "Warhorn", "Mysterious Charm", "Metronome", "Link Cable"],
+    "slots": [
+      {"name": "Fumungus", "level": 3, "stats": {"damage": 40, "poison": 81}},
+      {"name": "Gaiadrasil", "level": 1, "stats": {"damage": 10}},
+      {"name": "Gaiadrasil", "level": 1, "stats": {"damage": 10}},
+      {"name": "Noxalith", "level": 2, "stats": {"damage": 40, "poison": 10}},
+      {"name": "Saberhorn", "level": 1, "stats": {"damage": 110}},
+      {"name": "Thorntail", "level": 2, "stats": {"damage": 2242, "poison": 1}}
+    ]
+  },
+  "b": {"hp": 10000000, "slots": []},
+  "expect": {
+    "snapshot": {
+      "at": 14.0,
+      "a_units": {
+        "1": {"triggered": 5},
+        "2": {"triggered": 1},
+        "3": {"triggered": 1},
+        "4": {"triggered": 2, "dealt": 110},
+        "5": {"triggered": 1, "dealt": 120},
+        "6": {"triggered": 2}
+      }
+    }
+  }
+}

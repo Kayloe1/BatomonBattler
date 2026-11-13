@@ -17,8 +17,10 @@ DATA = Path(__file__).resolve().parent.parent / "data"
 STATS = ("damage", "heal", "shield", "poison", "burn", "shock")
 
 # Trainer HP per day, read from the HP bar in the 2026-11-11 runs (docs/step2-screen-map.md).
-# Days 9+ have not been seen since the game's updates: pass "hp" explicitly for them.
-DAY_HP = {1: 300, 2: 500, 3: 800, 4: 1400, 5: 2400, 6: 3800, 7: 5700, 8: 8300}
+# Days 9-14 were all seen on the opponent bars in the hand-played runs of 2026-11-12.
+# trainer HP by day, as in engine/data.py HP_BY_DAY (days 9-13 from earlier runs, 14 seen 2026-11-12)
+DAY_HP = {1: 300, 2: 500, 3: 800, 4: 1400, 5: 2400, 6: 3800, 7: 5700, 8: 8300, 9: 11600, 10: 17300,
+          11: 24900, 12: 34700, 13: 47300, 14: 63000}
 
 # Units that are not in the Batopedia CSVs. GUESS: the Dragon Egg (event reward) was seen dealing
 # 1 damage and triggering once in a ~19 s battle, so its cooldown is somewhere in 9.5-19 s.
@@ -137,6 +139,10 @@ def load_species() -> dict[str, Species]:
     with open(DATA / "batomon_pantra_levels.csv", newline="", encoding="utf-8") as f:
         level_rows = {r["name"]: r for r in csv.DictReader(f)}
     rows = [dict(r) for r in base_rows]
+    foreign = DATA / "foreign_monsters.csv"
+    if foreign.exists():
+        with open(foreign, newline="", encoding="utf-8") as f:
+            rows += [dict(r) for r in csv.DictReader(f)]
     for name, e in EXTRA_UNITS.items():
         rows.append({"name": name, "cost": e["cost"], "rarity": e["rarity"],
                      "types": "/".join(e["types"]), "cooldown_s": e["cooldown"],

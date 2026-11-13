@@ -21,6 +21,12 @@ SETTINGS = {
     # How Shock adds damage to an attack: "flat" adds the stacks to every hit,
     # "percent" adds stacks% to every hit, "none" ignores Shock.
     "shock_mode": "flat",
+    # Shock gained at an instant boosts hits only from the next instant on: two Bumblebolts casting
+    # together both dealt 63 (7 casts), and a Panbud casting with them got 2+6+10 Shock (2026-11-12).
+    "shock_next_instant": True,
+    # Every cast at an instant happens before deaths are checked: the opponent's Craghorn still cast
+    # at 18 s in a battle our casts ended at 18 s (2026-11-12).
+    "deaths_after_instant": True,
     # Heal cannot raise HP above the maximum.
     "heal_cap": True,
     # At equal times the player's side acts first, then the opponent's.

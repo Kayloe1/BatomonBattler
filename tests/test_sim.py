@@ -31,7 +31,8 @@ EMPTY = team([])
 class Data(unittest.TestCase):
     def test_all_pantra_species_load(self):
         sp = data.load_species()
-        self.assertEqual(len([n for n in sp if n not in data.EXTRA_UNITS]), 64)
+        foreign = {"Rhizuka", "Ignit", "Talonite", "Wishwash"}   # data/foreign_monsters.csv
+        self.assertEqual(len([n for n in sp if n not in data.EXTRA_UNITS and n not in foreign]), 64)
         for s in sp.values():
             for lv in (1, 2, 3, 4):
                 self.assertGreater(s.levels[lv].cooldown, 0, s.name)
@@ -129,8 +130,10 @@ class Mechanics(unittest.TestCase):
         r = simulate(team([mon("Panbud"), mon("Velocect"), None, None, mon("Cicadence")]), EMPTY,
                      until=6.0)
         velocect = r.units[0][1]
-        # Velocect casts at 3.5 (x2) and again when Cicadence casts at 6.0 (x2).
-        self.assertEqual(velocect["triggered"], 4)
+        # Velocect casts at 3.5 (x2) and again when Cicadence casts at 6.0 (x2): two casts, four hits.
+        # "triggered" counts casts, as the game's Stats screen does (seen 2026-11-12).
+        self.assertEqual(velocect["triggered"], 2)
+        self.assertEqual(velocect["dealt"], 60)
 
     def test_dracana_charges_ally_behind(self):
         r = simulate(team([mon("Stingarde"), mon("Dracana")]), EMPTY, until=5.0)
@@ -141,9 +144,10 @@ class Mechanics(unittest.TestCase):
         r = simulate(team([mon("Panbud"), mon("Formiqueen")]), EMPTY, until=4.0)
         self.assertEqual(r.units[0][0]["triggered"], 1)    # 5 s / 1.25 = 4 s
 
-    def test_multicast_counts_each_hit(self):
+    def test_multicast_hits_twice_but_triggers_once(self):
+        # Stats screen 2026-11-12: Velocect (15 x2) "Triggered 4 time(s)", "Dealt 144" with Shock on us.
         r = simulate(team([mon("Velocect")]), EMPTY, until=3.5)
-        self.assertEqual(r.units[0][0]["triggered"], 2)
+        self.assertEqual(r.units[0][0]["triggered"], 1)
         self.assertEqual(r.hp[1], 1000 - 30)
 
     def test_badges_replace_base_numbers(self):
@@ -153,9 +157,10 @@ class Mechanics(unittest.TestCase):
     def test_winner_and_draw(self):
         r = simulate(team([mon("Stingarde")], hp=100), team([], hp=100))
         self.assertEqual(r.winner, "a")
-        # Same instant: the player's side acts first (guess), so its hit ends the battle.
+        # Same instant: every cast of both sides resolves before deaths are checked (the opponent's
+        # Craghorn still cast at the 18 s instant our casts won at, 2026-11-12), so both die: draw.
         r = simulate(team([mon("Stingarde")], hp=100), team([mon("Stingarde")], hp=100))
-        self.assertEqual(r.winner, "a")
+        self.assertEqual(r.winner, "draw")
         # Both die to the same Poison tick: draw.
         r = simulate(team([mon("Venopuff")], hp=4), team([mon("Venopuff")], hp=4))
         self.assertEqual(r.winner, "draw")
@@ -306,3 +311,28 @@ class FromLogs(unittest.TestCase):
         self.assertEqual(cases[0]["result"], "loss")
         self.assertIn("opponent slot 1 not named", cases[0]["problems"])
         self.assertEqual(from_logs.check(cases)["skipped"], 1)
+
+
+class ShinyEffects(unittest.TestCase):
+    """What the Shiny cards said in the game (2026-11-12)."""
+
+    def test_shiny_stingarde_keeps_casting(self):
+        r = simulate(team([dict(mon("Stingarde"), shiny=True)]), EMPTY, until=18)
+        self.assertEqual(r.units[0][0]["triggered"], 3)
+        self.assertFalse(r.units[0][0].get("knocked_out"))
+
+    def test_shiny_battle_start_growth_scales_with_level(self):
+        a = team([dict(mon("Magmite"), shiny=True), dict(mon("Venopuff", 2), shiny=True)])
+        r = simulate(a, EMPTY, until=0.1)
+        self.assertEqual(r.units[0][0]["stats"]["shield"], 50)    # 40 + 10
+        self.assertEqual(r.units[0][1]["stats"]["poison"], 10)    # Lv2 8 + 2
+
+
+class GaiadrasilCountsOngoingDamage(unittest.TestCase):
+    def test_fumungus_poison_damage_is_counted(self):
+        # Fumungus (Ongoing: +200% of enemy Poison as Damage) next to Gaiadrasil: once the enemy
+        # is poisoned, Gaiadrasil's hit includes Fumungus's extra Damage (game, 2026-11-12).
+        a = team([mon("Fumungus", 2, poison=50), mon("Gaiadrasil")])
+        r = simulate(a, EMPTY, until=9.0)
+        fum, gaia = r.units[0]
+        self.assertGreater(gaia["dealt"], 50 * 2)        # more than Fumungus's own base Damage

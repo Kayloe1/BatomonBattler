@@ -34,6 +34,7 @@ class Unit:
     paid: int = 0                                  # what the copies cost (sell value basis)
     sell_value: int | None = None                  # as read in game, when known
     copies: int = 1                                # Lv1 copies inside (1, 3, 6, ...)
+    shiny: bool = False                            # Shiny copy (reader: a "Name@shiny" sprite); see sim SHINY_*
 
     @property
     def species(self) -> data.Species | None:
@@ -83,6 +84,7 @@ class Card:
     kind: str                                   # "monster" or "item"
     stats: tuple[tuple[str, int], ...] = ()
     rarity: str | None = None
+    shiny: bool = False                         # "SHINY" tag on the card (reader.shiny_tag_score)
 
 
 @dataclass
@@ -175,6 +177,8 @@ def buy(s: RunState, i: int) -> RunState:
             t.bug_discount_used = True
     stats = dict(card.stats) if card.stats else None
     unit = new_unit(card.name, price, 1, stats)
+    if card.shiny:
+        unit = replace(unit, shiny=True)
     place = _first_free(t)
     if place is None:
         t.bench.append(unit)                    # temporary 5th slot: it merges at once
@@ -220,8 +224,10 @@ def _merge(s: RunState, name: str) -> None:
                 stats["multicast"] = base.get("multicast", 1)
             else:
                 stats = parts[0][2].stat_dict()
+            # a Shiny copy keeps its Shiny through the merge (Venopuff, 2026-11-12)
             merged = Unit(name=name, level=new_level, paid=sum(p[2].paid for p in parts),
-                          copies=sum(p[2].copies for p in parts)).with_stats(stats)
+                          copies=sum(p[2].copies for p in parts),
+                          shiny=any(p[2].shiny for p in parts)).with_stats(stats)
             # lands in a team slot of one of the copies if any, else the first copy's slot
             target = next(((w, i) for w, i, _ in parts if w == TEAM), (parts[0][0], parts[0][1]))
             for w, i, _ in parts:
@@ -256,6 +262,9 @@ def move(s: RunState, src: tuple[str, int], dst: tuple[str, int]) -> RunState:
 AVOID_ITEMS = {"Recombobulator", "Magic Lasso"}
 GIFT_ITEMS = {"Dowsing Rod": "Common", "Purple Gift": "Super Rare", "Golden Gift": "Legendary"}
 CANDIES = {"Basic Candy": ("Common", "Uncommon"), "Rare Candy": data.RARITIES}
+# Ultra Candy (Mythical, $60): "Level up a random level 3 monster" -> level 4
+CANDY_LEVEL = {"Basic Candy": 1, "Rare Candy": 1, "Ultra Candy": 3}
+CANDIES["Ultra Candy"] = data.RARITIES
 MAX_OUTCOMES = 6          # random items are scored on a sample of their possible results
 
 
@@ -278,7 +287,7 @@ def _level_up(u: Unit) -> Unit:
     """The unit one level higher, keeping what it grew (what a Candy does)."""
     sp = u.species
     new = u.level + 1
-    if sp is None or new > 3:
+    if sp is None or new > 4:            # candies and events go up to level 4 ("max level 4")
         return u
     base = sp.stats(new)
     grown = u.growth()
@@ -316,8 +325,8 @@ def item_outcomes(s: RunState, i: int) -> list[RunState]:
         t.items_left -= 1
         kinds = CANDIES[name]
         outs = []
-        for w, k, u in t.owned():
-            if u.level == 1 and u.species and u.species.rarity in kinds:
+        for w, k, u in t.owned():               # bench included (a Rare Candy hit the bench, 2026-11-12)
+            if u.level == CANDY_LEVEL[name] and u.species and u.species.rarity in kinds:
                 u2 = t.copy()
                 u2.set_slot(w, k, _level_up(u))
                 outs.append(u2)
@@ -350,13 +359,60 @@ def item_outcomes(s: RunState, i: int) -> list[RunState]:
         t.items_left -= 1
         t.gifts.append(GIFT_ITEMS[name])
         return [t]
+    # Witch potions (seen 2026-11-12)
+    if name == "Summon Potion":                 # a random level 2 Common, no sell value
+        t.items_left -= 1
+        outs = []
+        for sp in data.by_rarity("Common"):
+            u = t.copy()
+            if _add_unit(u, replace(new_unit(sp.name, 0, 2), sell_value=0)):
+                outs.append(u)
+        return outs
+    if name == "Glimmer Potion":                # "All monsters in your shop this turn are SHINY"
+        t.items_left -= 1
+        t.shop = [replace(c, shiny=True) if c and c.kind == "monster" else c for c in t.shop]
+        return [t]
+    if name == "Mirror Potion":                 # "Roll a shop that contains only monsters on your team and bench"
+        t.items_left -= 1
+        names = sorted({u.name for _, _, u in t.owned() if u.species and not u.species.foreign})
+        if not names:
+            return [t]
+        rng = random.Random(sum(map(ord, "".join(names))) + t.day)     # stable across processes
+        outs = []
+        for _ in range(3):
+            u = t.copy()
+            u.shop = [Card(n, data.species(n).cost, "monster", (), data.species(n).rarity)
+                      for n in rng.choices(names, k=5)]
+            outs.append(u)
+        return outs
+    if name == "Legendary Potion":              # fill every empty team and bench slot, no sell value
+        t.items_left -= 1
+        pool = sorted(data.by_rarity("Legendary"), key=lambda sp: sp.name)
+        rng = random.Random(t.day * 31 + len(pool))
+        outs = []
+        for _ in range(3):
+            u = t.copy()
+            while _first_free(u) is not None:
+                sp = rng.choice(pool)
+                _add_unit(u, replace(new_unit(sp.name, 0), sell_value=0))
+            outs.append(u)
+        return outs
+    if name == "Shiny Potion":                  # a random monster (bench included) turns Shiny
+        t.items_left -= 1
+        outs = []
+        for w, k, u in t.owned():
+            u2 = t.copy()
+            u2.set_slot(w, k, replace(u, shiny=True))
+            outs.append(u2)
+        return outs
     return [use_item(s, i)]
 
 
 def use_item(s: RunState, i: int, rng: random.Random | None = None) -> RunState:
     card = s.shop[i]
     if card.name in ("Voucher", "Apex Bait", "Lootbox", "Recruiting Flyer", "Gold Powder", "Basic Candy",
-                     "Rare Candy") or card.name in GIFT_ITEMS:
+                     "Rare Candy", "Ultra Candy", "Summon Potion", "Shiny Potion", "Glimmer Potion",
+                     "Mirror Potion", "Legendary Potion") or card.name in GIFT_ITEMS:
         outs = item_outcomes(s, i)
         if not outs:                      # nothing to act on: the item is just spent
             t = s.copy()
@@ -397,6 +453,17 @@ def use_item(s: RunState, i: int, rng: random.Random | None = None) -> RunState:
     elif name == "Lucky Coin":
         t.money += 3
         t.items_left += 1
+    elif name == "Gold Potion":                 # "Gain $10"
+        t.money += 10
+    elif name == "Growth Potion":
+        # "Give each of your monsters a small amount of Damage, Poison or Burn" (bench too; patch 1.5:
+        # Damage 4-9, Poison/Burn 1-4). Modelled as the expectation over the three.
+        for w, k, u in owned:
+            d = u.stat_dict()
+            d["damage"] += 2
+            d["poison"] += 1
+            d["burn"] += 1
+            t.set_slot(w, k, u.with_stats(d))
     elif name == "Red Coin":
         t.money += 20
         t.lives -= 1
@@ -423,7 +490,9 @@ MODELLED_ITEMS = {"Cake", "Feast", "Pom Berry", "Coupon", "Fake Coin", "Lucky Co
                   "Tote Bag", "Nana Berry", "Focus Pill", "Green Stone", "Gray Ticket", "Green Ticket",
                   "Blue Ticket", "Purple Ticket", "Golden Ticket", "Coffee",
                   "Voucher", "Apex Bait", "Basic Candy", "Rare Candy", "Lootbox", "Recruiting Flyer",
-                  "Gold Powder", "Dowsing Rod", "Purple Gift", "Golden Gift"}
+                  "Gold Powder", "Dowsing Rod", "Purple Gift", "Golden Gift",
+                  "Ultra Candy", "Summon Potion", "Shiny Potion", "Gold Potion", "Growth Potion",
+                  "Glimmer Potion", "Mirror Potion", "Legendary Potion"}
 
 
 def item_is_worth_using(s: RunState, card: Card) -> bool:
@@ -501,14 +570,15 @@ def unit_from_reader(slot: dict | None, price_hint: int | None = None) -> Unit |
         stats["multicast"] = sp.stats(level).get("multicast", 1)
     paid = price_hint if price_hint is not None else (sp.cost * data.COPIES_FOR_LEVEL.get(level, 1) if sp else 0)
     return Unit(name=name, level=level, paid=paid, sell_value=slot.get("sell_value"),
-                copies=data.COPIES_FOR_LEVEL.get(level, 1)).with_stats(stats)
+                copies=data.COPIES_FOR_LEVEL.get(level, 1), shiny=bool(slot.get("shiny"))).with_stats(stats)
 
 
 def card_from_reader(card: dict | None) -> Card | None:
     if card is None or card.get("name") is None or card.get("price") is None:
         return None
     return Card(card["name"], card["price"], card.get("kind") or "monster",
-                tuple(sorted(_stats_from_badges(card.get("stats")).items())), card.get("rarity"))
+                tuple(sorted(_stats_from_badges(card.get("stats")).items())), card.get("rarity"),
+                shiny=bool(card.get("shiny")))
 
 
 def from_reader(state: dict, memory: dict | None = None) -> RunState:
