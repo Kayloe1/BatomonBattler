@@ -1,0 +1,7 @@
+name,cost,rarity,types,cooldown_s,active,passive,source
+Ignit,40,Rare,Fire,8.0,Burn 1,On Victory: Evolve,"Batopedia ??? tab (2026-11-12); gained from the crying baby basilisk event (Adopt it); sells for $20; evolves into ? (probably Basilord: patch 1.5 lists Basilord Burn 190/380/570 under Events)"
+Talonite,20,Rare,Flying/Rock,12.0,Deal 30 damage; Multicast 2,On Battle Start: +20 Shield permanently for each Rock ally and +1 Multicast permanently for each Flying ally,Batopedia ??? tab
+Wishwash,40,Super Rare,Water,3.5,Heal 150,On Battle Start: Gain a random non-unique Rare Trinket,Batopedia ??? tab
+Cosmivore,80,Mythical,Ghost,7.0,Deal 1 damage,"When rerolling the shop, gain 20% of the total stats of the monsters remaining in the shop (excluding Multicast and Cooldown)",Batopedia ??? tab
+Faebloom,80,Mythical,Grass,7.0,Deal ??? damage,Mythical Items may appear in your shop. Ongoing: Adjacent allies have +10% Damage per Mythical Item used,Batopedia ??? tab
+Omnichrome,80,Mythical,All,5.0,Deal 1 damage,On Battle Start: Gain 80% of the stats of the enemy monster with the highest stats permanently (excluding Multicast and Cooldown),Batopedia ??? tab
