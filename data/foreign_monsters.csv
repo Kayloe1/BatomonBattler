@@ -1,0 +1,2 @@
+name,cost,rarity,types,cooldown_s,active,passive,source
+Rhizuka,30,Rare,Rock,15.0,Deal 200 damage,Trigger this when an ally applies Shield (Except other Rhizuka),"Jinto monster from the event choice 'Gain a foreign Rare monster. It can now appear in your shop.' (bot run, 2026-11-12). Card read in game: Rare, Rock, 15.0 s, Deal 200 damage; sells for $15. Cost guessed as $30 (twice the sell value)."

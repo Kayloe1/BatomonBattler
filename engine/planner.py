@@ -62,6 +62,8 @@ class Params:
     screen: int = 2            # cards tried per greedy step (best by a quick estimate)
     final_rounds: int = 3
     margin_weight: float = 0.3   # how much "closer battles" count next to battles won
+    grow_next: bool = True       # score tomorrow with the permanent growth one battle gives (Thorntail,
+                                 # Noxalith->Fumungus...): those growers carried both hand-played runs
 
 
 @dataclass
@@ -112,6 +114,7 @@ class Planner:
         self.ev.margin_weight = self.p.margin_weight
         self.rng = random.Random(seed)
         self._arranged: dict[tuple, tuple[list, list]] = {}
+        self._grown: dict[tuple, list] = {}
 
     # ------------------------------------------------------------ scoring ----
     def _hp(self, s: RunState, day: int) -> int:
@@ -127,14 +130,27 @@ class Planner:
         today = self.ev.score(team, s.day, k, hp=self._hp(s, s.day), trainer=s.trainer, trinkets=s.trinkets)
         if self.p.w_next == 0:
             return self.p.w_today * stake_weight(s) * today.value
-        nxt = self.ev.score(team, s.day + 1, k, hp=self._hp(s, s.day + 1), trainer=s.trainer,
+        team_next = self.grown(team, s) if self.p.grow_next else team
+        nxt = self.ev.score(team_next, s.day + 1, k, hp=self._hp(s, s.day + 1), trainer=s.trainer,
                             trinkets=s.trinkets)
         v = self.p.w_today * stake_weight(s) * today.value + self.p.w_next * nxt.value
         if self.p.w_next2:
-            nxt2 = self.ev.score(team, s.day + 2, k, hp=self._hp(s, s.day + 2), trainer=s.trainer,
+            nxt2 = self.ev.score(team_next, s.day + 2, k, hp=self._hp(s, s.day + 2), trainer=s.trainer,
                                  trinkets=s.trinkets)
             v += self.p.w_next2 * nxt2.value
         return v
+
+    def grown(self, team: list[Unit | None], s: RunState) -> list[Unit | None]:
+        """The team after one battle's permanent growth (engine/growth.py), cached per team."""
+        key = (team_key(team), s.trainer, tuple(s.trinkets))
+        hit = self._grown.get(key)
+        if hit is None:
+            from .evaluate import team_spec
+            from .growth import after_mirror_battle
+            spec = team_spec(team, self._hp(s, s.day), s.trainer, s.trinkets)
+            hit = after_mirror_battle(team, spec) if any(spec["slots"]) else team
+            self._grown[key] = hit
+        return hit
 
     def win_today(self, s: RunState, team: list[Unit | None], k: int | None = None) -> float:
         return self.ev.score(team, s.day, k or self.p.k_final, hp=self._hp(s, s.day), trainer=s.trainer,

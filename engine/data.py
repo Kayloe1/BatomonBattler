@@ -80,6 +80,7 @@ class Species:
     self_ko: bool = False
     evolves: bool = False
     no_ability: bool = False                                   # Stellagon / Focus Pill condition
+    foreign: bool = False                                      # data/foreign_monsters.csv (another region)
 
     @property
     def is_bug(self) -> bool:
@@ -118,45 +119,52 @@ def roster() -> dict[str, Species]:
         for row in csv.DictReader(f):
             levels[row["name"]] = row
     out: dict[str, Species] = {}
+    rows = []
     with open(DATA / "batomon_pantra.csv", encoding="utf-8") as f:
-        for row in csv.DictReader(f):
-            name = row["name"]
-            cd = float(row["cooldown_s"])
-            stats = {1: _parse_active(row["active"])}
-            cds = {1: cd}
-            text = {1: (row["active"] + " | " + row["passive"]).strip(" |")}
-            lv = levels.get(name, {})
+        rows += [(r, False) for r in csv.DictReader(f)]
+    foreign = DATA / "foreign_monsters.csv"
+    if foreign.exists():
+        with open(foreign, encoding="utf-8") as f:
+            rows += [(r, True) for r in csv.DictReader(f)]
+    for row, is_foreign in rows:
+        name = row["name"]
+        cd = float(row["cooldown_s"])
+        stats = {1: _parse_active(row["active"])}
+        cds = {1: cd}
+        text = {1: (row["active"] + " | " + row["passive"]).strip(" |")}
+        lv = levels.get(name, {})
+        for n in (2, 3, 4):
+            t = lv.get(f"lv{n}", "") or ""
+            text[n] = t
+            body = re.sub(r"^(EVOLVED:?\s*\w*:?|\w+:)\s*", "", t) if t.startswith(("EVOLVED", "Bambudo", "Sunsage")) else t
+            body = re.sub(r"^CD [\d.]+s\s*", "", body)
+            s = _parse_active(body) if body and not body.startswith("same") else dict(stats[n - 1])
+            # a level row that only changes a number in the passive keeps the active
+            if not any(s[k] for k in STATS if k != "multicast") and any(stats[n - 1][k] for k in STATS if k != "multicast"):
+                keep = dict(stats[n - 1])
+                keep["multicast"] = max(keep["multicast"], s["multicast"])
+                s = keep
+            stats[n] = s
+            m = re.search(r"CD ([\d.]+)s", t)
+            cds[n] = float(m.group(1)) if m else cds[n - 1]
+        passive = row["passive"] or ""
+        growth = {}
+        if "After you buy a Bug" in passive and "Damage" in passive:
+            g1 = int(re.search(r"\+(\d+) Damage", passive).group(1))
+            growth = {1: g1}
             for n in (2, 3, 4):
-                t = lv.get(f"lv{n}", "") or ""
-                text[n] = t
-                body = re.sub(r"^(EVOLVED:?\s*\w*:?|\w+:)\s*", "", t) if t.startswith(("EVOLVED", "Bambudo", "Sunsage")) else t
-                body = re.sub(r"^CD [\d.]+s\s*", "", body)
-                s = _parse_active(body) if body and not body.startswith("same") else dict(stats[n - 1])
-                # a level row that only changes a number in the passive keeps the active
-                if not any(s[k] for k in STATS if k != "multicast") and any(stats[n - 1][k] for k in STATS if k != "multicast"):
-                    keep = dict(stats[n - 1])
-                    keep["multicast"] = max(keep["multicast"], s["multicast"])
-                    s = keep
-                stats[n] = s
-                m = re.search(r"CD ([\d.]+)s", t)
-                cds[n] = float(m.group(1)) if m else cds[n - 1]
-            passive = row["passive"] or ""
-            growth = {}
-            if "After you buy a Bug" in passive and "Damage" in passive:
-                g1 = int(re.search(r"\+(\d+) Damage", passive).group(1))
-                growth = {1: g1}
-                for n in (2, 3, 4):
-                    m = re.search(r"\+(\d+) Damage per Bug", text[n])
-                    growth[n] = int(m.group(1)) if m else growth[n - 1]
-            out[name] = Species(
-                name=name, cost=int(row["cost"]), rarity=row["rarity"],
-                types=tuple(row["types"].split("/")), cooldown=cd,
-                level_stats=stats, level_cooldown=cds, passive=passive, level_text=text,
-                bug_growth=growth,
-                self_ko="Knockout self" in passive,
-                evolves="Evolves at level 3" in passive,
-                no_ability=not passive,
-            )
+                m = re.search(r"\+(\d+) Damage per Bug", text[n])
+                growth[n] = int(m.group(1)) if m else growth[n - 1]
+        out[name] = Species(
+            name=name, cost=int(row["cost"]), rarity=row["rarity"],
+            types=tuple(row["types"].split("/")), cooldown=cd,
+            level_stats=stats, level_cooldown=cds, passive=passive, level_text=text,
+            bug_growth=growth,
+            self_ko="Knockout self" in passive,
+            evolves="Evolves at level 3" in passive,
+            no_ability=not passive,
+            foreign=is_foreign,
+        )
     return out
 
 
@@ -165,7 +173,8 @@ def species(name: str | None) -> Species | None:
 
 
 def by_rarity(rarity: str) -> list[Species]:
-    return [s for s in roster().values() if s.rarity == rarity]
+    """Pantra monsters of a rarity (foreign monsters only reach the shop through an event)."""
+    return [s for s in roster().values() if s.rarity == rarity and not s.foreign]
 
 
 @lru_cache(maxsize=1)

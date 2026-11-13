@@ -26,7 +26,8 @@ def small_planner():
 class Data(unittest.TestCase):
     def test_roster(self):
         r = data.roster()
-        self.assertEqual(len(r), 64)
+        self.assertEqual(len([n for n, sp in r.items() if not sp.foreign]), 64)   # Pantra
+        self.assertTrue(r["Rhizuka"].foreign)
         self.assertEqual(r["Guardiant"].bug_growth[1], 8)
         self.assertTrue(r["Stingarde"].self_ko)
         self.assertTrue(r["Panbud"].evolves)

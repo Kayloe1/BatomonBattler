@@ -303,6 +303,9 @@ SPRITE_MATCH_MAX = 45.0     # mean colour difference allowed for a sprite match
 
 _names = json.loads((ROOT / "data" / "names.json").read_text(encoding="utf-8"))
 MONSTER_NAMES: list[str] = list(_names["pantra_batomon_base_price"]) + list(_names["evolved_forms_seen"])
+if (ROOT / "data" / "foreign_monsters.csv").exists():          # event-given monsters of another region
+    with open(ROOT / "data" / "foreign_monsters.csv", newline="", encoding="utf-8") as _f:
+        MONSTER_NAMES += [row["name"] for row in csv.DictReader(_f)]
 ITEM_NAMES: list[str] = list(_names["items"])
 with open(ROOT / "data" / "trainers.csv", newline="", encoding="utf-8") as _f:
     TRAINER_NAMES: list[str] = [row["name"] for row in csv.DictReader(_f)]
@@ -718,6 +721,9 @@ def _hist_dist(a: np.ndarray, b: np.ndarray) -> float:
 
 
 SHINY_SUFFIX = "@shiny"
+# Sprites used only for team/bench slots: the Egg Breeder's Purple Egg matched the Dragon Egg on the
+# battle field, and the two eggs do the same thing in battle (nothing).
+OWNED_ONLY_SPRITES = {"Purple Egg"}
 
 
 def species_of(sprite_name: str | None) -> str | None:
@@ -846,6 +852,8 @@ def _battle_templates() -> list[tuple[str, np.ndarray, np.ndarray]]:
     if _battle_tpls is None:
         _battle_tpls = []
         for name, tpl in _sprite_templates():
+            if name.endswith(SHINY_SUFFIX) or name in OWNED_ONLY_SPRITES:
+                continue              # battle logs use species names; eggs look alike on the field
             mask = np.abs(tpl.astype(int) - 255).sum(axis=2) > 60
             if mask.sum() >= 50:
                 _battle_tpls.append((name, tpl, mask))
@@ -892,7 +900,8 @@ def _read_battle_slot(pic: np.ndarray, side: int, i: int, problems: list[str]) -
         return None                       # no "LV." label: empty slot
     where = f"{'my' if side == 0 else 'opponent'} slot {i}"
     parts = glyphs.segment(fill)
-    level_text = store().classify("level", parts[-1].bitmap)[0] if len(parts) >= 3 else ""
+    # "LV", ".", digit: the digit is the third piece (a sprite pixel of the label colour can follow it)
+    level_text = store().classify("level", parts[2].bitmap)[0] if len(parts) >= 3 else ""
     level = _to_int(level_text)
     if level is None:
         problems.append(f"{where}: cannot read level ('{level_text}')")
@@ -1151,7 +1160,8 @@ def _read_owned_slot(pic: np.ndarray, box: Box, where: str, problems: list[str])
     # "LV. n" label, top left: coloured letters with a black outline
     fill = level_mask(rgb)
     parts = glyphs.segment(fill)          # "LV", ".", digit
-    level_text = store().classify("level", parts[-1].bitmap)[0] if len(parts) >= 3 else ""
+    # "LV", ".", digit: the digit is the third piece (a sprite pixel of the label colour can follow it)
+    level_text = store().classify("level", parts[2].bitmap)[0] if len(parts) >= 3 else ""
     level = _to_int(level_text)
     if level is None:
         problems.append(f"{where}: cannot read level ('{level_text}')")

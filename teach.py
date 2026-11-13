@@ -261,7 +261,7 @@ def main() -> None:
             for i, (name, level, digits) in lesson.get(kind, {}).items():
                 x0, y0, x1, y1 = box_of(i)
                 rgb = pic[y0:y1, x0:x1]
-                store.add("level", level, glyphs.segment(reader.level_mask(rgb))[-1].bitmap)
+                store.add("level", level, glyphs.segment(reader.level_mask(rgb))[2].bitmap)
                 _teach_digits(store, "badge", reader.badge_digit_glyphs(pic, reader.owned_badge_band(box_of(i))),
                               digits, f"{kind} {i}")
                 reader.learn_sprite(name, rgb)
