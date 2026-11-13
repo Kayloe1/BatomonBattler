@@ -58,7 +58,7 @@ Double-click `control_window.bat`, or run `.\.venv\Scripts\python.exe gui.py`. I
   Pause and Stop wait for the current action to finish: a click or drag is never cut in half, and a
   battle that is running is waited out first (the window says so while it waits).
 - **Status** shows day, lives, badges, money, trainer, the screen, the last action with its result, and
-  the chance to win today's battle. **Thinking** shows the same lines as `logs	hinking_<time>.txt`,
+  the chance to win today's battle. **Thinking** shows the same lines as `logs\thinking_<time>.txt`,
   with each action's result in blue between them.
 - When the bot stops because it cannot read something, a **red box** gives the reason and the name of
   the saved capture, with buttons to open the picture and to copy the message for Claude. It still beeps.
