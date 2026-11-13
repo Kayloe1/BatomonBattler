@@ -192,6 +192,22 @@ LESSONS = [
         "file": "captures/shop_day11_hp.png",
         "text": {"hp": "24900"},
     },
+    {   # bot run 2026-11-12: the third trainer card had letters not seen before
+        "file": "captures/trainer_pick_20261112_210240.png",
+        "trainer_cards": ["TREASURE HUNTER", "CHEMIST", "MASKED MAN"],
+    },
+    {   # bot run 2026-11-12, Stats window: digits 4 and 8 not seen before (the yellow Shock lines
+        # are not found as text bands, so those two cards are left out)
+        "file": "captures/battles/20261112_210418_stats_top.png",
+        "stats": {
+            (0, 0): ["Dealt 154 damage", "Triggered 1 time(s)"],
+            (0, 1): ["Dealt 69 damage", "Inflicted 28 Poison", "Triggered 7 time(s)"],
+            (0, 3): ["Dealt 80 damage", "Healed 90 HP", "Triggered 3 time(s)"],
+            (0, 4): ["Dealt 80 damage", "Healed 90 HP", "Triggered 3 time(s)"],
+            (0, 5): ["Dealt 154 damage", "Triggered 1 time(s)"],
+            (1, 1): ["Dealt 154 damage", "Triggered 1 time(s)"],
+        },
+    },
 ]
 
 
