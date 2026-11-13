@@ -97,3 +97,25 @@ class LogsWithStats(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LoggedTeamNames(unittest.TestCase):
+    def test_unnamed_battle_slot_takes_the_unique_team_match(self):
+        badge = lambda stat, v: {"stat": stat, "value": v}
+        team = [{"name": "Reapra", "level": 1, "stats": [badge("damage", 120)]},
+                {"name": "Spinarai", "level": 2, "stats": [badge("damage", 6), badge("poison", 11)]},
+                {"name": "Joltail", "level": 1, "stats": [badge("damage", 30)]},
+                {"name": "Ironcore", "level": 1, "stats": [badge("damage", 30)]}]
+        slots = [from_logs._slot({"name": None, "level": 1, "stats": [badge("damage", 120)]}),
+                 from_logs._slot({"name": None, "level": 1, "stats": [badge("damage", 30)]})]
+        from_logs._name_from_team(slots, team)
+        self.assertEqual(slots[0]["name"], "Reapra")
+        self.assertIsNone(slots[1]["name"])          # Joltail or Ironcore: not unique
+
+
+class BattleSpriteRule(unittest.TestCase):
+    def test_acceptance(self):
+        self.assertTrue(reader._battle_match_ok(42, 49))      # Bumblebolt, seen right
+        self.assertTrue(reader._battle_match_ok(63, 82))      # Spinarai with an effect on it
+        self.assertFalse(reader._battle_match_ok(60, 73))     # Aristobat on a Shiny monster: wrong
+        self.assertFalse(reader._battle_match_ok(70, 140))    # too far from anything

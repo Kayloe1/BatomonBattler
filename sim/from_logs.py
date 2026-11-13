@@ -44,6 +44,19 @@ def _slot(s: dict | None) -> dict | None:
     return out
 
 
+def _name_from_team(slots: list, team: list | None) -> None:
+    """Name my unnamed battle slots from the shop team logged with the battle: the one team monster
+    with the same level, stats and Multicast (the battle grid is laid out differently from the shop
+    grid, so slots are matched by numbers, not position). Left unnamed when it is not unique."""
+    known = [x for x in (_slot(t) for t in (team or [])) if x and x["name"]]
+    for s in slots:
+        if s and not s["name"]:
+            same = {k["name"] for k in known if k["level"] == s["level"] and k["stats"] == s["stats"]
+                    and k.get("multicast") == s.get("multicast")}
+            if len(same) == 1:
+                s["name"] = same.pop()
+
+
 def battles_from_log(path: Path) -> list[dict]:
     """One case per logged battle: {"a", "b", "day", "result", "problems", "source"}."""
     records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -63,6 +76,7 @@ def battles_from_log(path: Path) -> list[dict]:
             problems = list(seen.get("problems", []))
             mine = [_slot(s) for s in seen.get("my_team", [])] or [None] * 6
             theirs = [_slot(s) for s in seen.get("opponent_team", [])] or [None] * 6
+            _name_from_team(mine, rec.get("team"))
             if not seen:
                 problems.append("battle screen not read")
             for side, team in (("my", mine), ("opponent", theirs)):

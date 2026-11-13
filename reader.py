@@ -800,7 +800,8 @@ def battle_slot(side: int, i: int) -> Box:
 CARD_SPRITE_DIR = ROOT / "templates" / "card_sprites"
 CARD_SPRITE_ROWS = (1186, 1290)     # the picture part of a shop card, above its badges
 CARD_SPRITES_PER_NAME = 3
-BATTLE_SPRITE_MAX = 45.0   # RMS colour difference over the sprite's own pixels
+BATTLE_SPRITE_MAX = 66.0       # RMS colour difference over the sprite's own pixels
+BATTLE_SPRITE_MAX_SURE = 50.0  # below this a smaller lead over the runner-up is enough
 BATTLE_SEARCH = 24         # sprites bob and sit a little differently; search this far around
 
 _battle_tpls: list[tuple[str, np.ndarray, np.ndarray]] | None = None
@@ -924,9 +925,20 @@ def match_battle_sprite(pic: np.ndarray, box: Box, mirrored: bool) -> tuple[str 
         return None, 1e9
     ranked = sorted(by_name.items(), key=lambda kv: kv[1])
     best, best_d = ranked[0]
-    if best_d > BATTLE_SPRITE_MAX or (len(ranked) > 1 and best_d * 2 > ranked[1][1]):
+    second = ranked[1][1] if len(ranked) > 1 else 1e9
+    if not _battle_match_ok(best_d, second):
         return None, best_d
     return best, best_d
+
+
+def _battle_match_ok(best: float, second: float) -> bool:
+    """Accept a battle sprite match. Set by eye on 48 unnamed slots of 32 saved battles
+    (2026-11-13): every match at 50 or less was right; above that, the wrong ones (often
+    Aristobat or Stalagrove fitting nothing well) were within 1.22x of the runner-up, the right
+    ones mostly 1.3x or more ahead. Shiny monsters and attack effects land in the 40-65 range."""
+    if best <= BATTLE_SPRITE_MAX_SURE:
+        return second >= best * 1.15
+    return best <= BATTLE_SPRITE_MAX and second >= best * 1.3
 
 
 def _read_battle_slot(pic: np.ndarray, side: int, i: int, problems: list[str]) -> dict | None:
