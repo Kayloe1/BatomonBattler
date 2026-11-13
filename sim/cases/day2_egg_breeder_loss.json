@@ -1,0 +1,43 @@
+{
+  "title": "Egg Breeder run, Day 2 loss (2026-11-12 night, played by hand)",
+  "sources": "Battle screen, Stats screen and end HP bars read by eye (docs/overnight-play-notes.md). End: us 0/500, them 29/500.",
+  "a": {
+    "trainer": "Egg Breeder", "hp": 500,
+    "slots": [
+      null,
+      {"name": "Magmite", "level": 1, "stats": {"shield": 40, "burn": 4}},
+      {"name": "Stingarde", "level": 1, "stats": {"damage": 150}},
+      {"name": "Panbud", "level": 1, "stats": {"damage": 25}},
+      {"name": "Guardiant", "level": 1, "stats": {"damage": 23}},
+      {"name": "Guardiant", "level": 1, "stats": {"damage": 31}}
+    ]
+  },
+  "b": {
+    "hp": 500,
+    "slots": [
+      {"name": "Velocect", "level": 1, "stats": {"damage": 15}},
+      {"name": "Stingarde", "level": 1, "stats": {"damage": 150}},
+      {"name": "Guardiant", "level": 1, "stats": {"damage": 38}},
+      null,
+      {"name": "Bumblebolt", "level": 1, "stats": {"damage": 3, "shock": 1}},
+      {"name": "Velocect", "level": 1, "stats": {"damage": 15}}
+    ]
+  },
+  "expect": {
+    "winner": "b",
+    "a_units": {
+      "2": {"triggered": 3, "inflicted_burn": 12},
+      "3": {"triggered": 1, "dealt": 150},
+      "4": {"triggered": 3, "dealt": 75},
+      "5": {"triggered": 4, "dealt": 92},
+      "6": {"triggered": 4, "dealt": 124}
+    },
+    "b_units": {
+      "1": {"triggered": 4, "dealt": 144},
+      "2": {"triggered": 1, "dealt": 152},
+      "3": {"triggered": 4, "dealt": 166},
+      "5": {"triggered": 6, "dealt": 33, "inflicted_shock": 6},
+      "6": {"triggered": 4, "dealt": 144}
+    }
+  }
+}

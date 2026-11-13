@@ -1,0 +1,29 @@
+{
+  "title": "Egg Breeder run, Day 1 loss (2026-11-12 night, played by hand)",
+  "sources": "Stats screen and end-of-battle HP bars read by eye during manual play (docs/overnight-play-notes.md)",
+  "a": {
+    "trainer": "Egg Breeder", "hp": 300,
+    "slots": [
+      null, null, null, null,
+      {"name": "Guardiant", "level": 1, "stats": {"damage": 15}},
+      {"name": "Guardiant", "level": 1, "stats": {"damage": 23}}
+    ]
+  },
+  "b": {
+    "hp": 300,
+    "slots": [
+      null, null, null, null, null,
+      {"name": "Venopuff", "level": 1, "stats": {"poison": 4}}
+    ]
+  },
+  "expect": {
+    "winner": "b",
+    "a_units": {
+      "5": {"triggered": 6, "dealt": 90},
+      "6": {"triggered": 6, "dealt": 138}
+    },
+    "b_units": {
+      "6": {"triggered": 6, "inflicted_poison": 24}
+    }
+  }
+}

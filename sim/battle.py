@@ -413,12 +413,11 @@ class Battle:
         me, foe = self.trainers[u.side], self.trainers[1 - u.side]
         mc = self.multicast_of(u)
         u.casts += 1
+        u.triggers += 1          # the Stats screen counts casts, not Multicast hits (Velocect x2: 4 casts = "4 times")
         for _ in range(mc):
-            u.triggers += 1
             dmg = self.damage_of(u)
             if dmg > 0:
-                self.hit(foe, dmg, u)
-                u.dealt += dmg
+                u.dealt += self.hit(foe, dmg, u)   # "Dealt" on the Stats screen includes the Shock bonus
             if u.stats["heal"] > 0:
                 self.heal(me, u.stats["heal"])
                 u.healed += u.stats["heal"]

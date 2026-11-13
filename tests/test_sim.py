@@ -129,8 +129,10 @@ class Mechanics(unittest.TestCase):
         r = simulate(team([mon("Panbud"), mon("Velocect"), None, None, mon("Cicadence")]), EMPTY,
                      until=6.0)
         velocect = r.units[0][1]
-        # Velocect casts at 3.5 (x2) and again when Cicadence casts at 6.0 (x2).
-        self.assertEqual(velocect["triggered"], 4)
+        # Velocect casts at 3.5 (x2) and again when Cicadence casts at 6.0 (x2): two casts, four hits.
+        # "triggered" counts casts, as the game's Stats screen does (seen 2026-11-12).
+        self.assertEqual(velocect["triggered"], 2)
+        self.assertEqual(velocect["dealt"], 60)
 
     def test_dracana_charges_ally_behind(self):
         r = simulate(team([mon("Stingarde"), mon("Dracana")]), EMPTY, until=5.0)
@@ -141,9 +143,10 @@ class Mechanics(unittest.TestCase):
         r = simulate(team([mon("Panbud"), mon("Formiqueen")]), EMPTY, until=4.0)
         self.assertEqual(r.units[0][0]["triggered"], 1)    # 5 s / 1.25 = 4 s
 
-    def test_multicast_counts_each_hit(self):
+    def test_multicast_hits_twice_but_triggers_once(self):
+        # Stats screen 2026-11-12: Velocect (15 x2) "Triggered 4 time(s)", "Dealt 144" with Shock on us.
         r = simulate(team([mon("Velocect")]), EMPTY, until=3.5)
-        self.assertEqual(r.units[0][0]["triggered"], 2)
+        self.assertEqual(r.units[0][0]["triggered"], 1)
         self.assertEqual(r.hp[1], 1000 - 30)
 
     def test_badges_replace_base_numbers(self):
