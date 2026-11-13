@@ -813,7 +813,9 @@ def card_sprite(pic: np.ndarray, i: int) -> tuple[np.ndarray, np.ndarray] | None
     r = pic[CARD_SPRITE_ROWS[0]:CARD_SPRITE_ROWS[1], x0 + 8:x1 - 8]
     outline = r.max(axis=2) < 70
     n, lab = cv2.connectedComponents((~outline).astype(np.uint8), connectivity=4)
-    edge = (set(lab[0]) | set(lab[:, 0]) | set(lab[:, -1])) - {0}
+    # Seed the panel from the side edges only: big sprites poke above and below these rows,
+    # and seeding from the top or bottom row would eat the sprite's inside and leave its outline.
+    edge = (set(lab[:, 0]) | set(lab[:, -1])) - {0}
     mask = ~(np.isin(lab, list(edge)) & ~outline)
     n, lab, st, _ = cv2.connectedComponentsWithStats(mask.astype(np.uint8), connectivity=8)
     if n < 2:
@@ -846,6 +848,8 @@ def learn_card_sprites(pic: np.ndarray, state: dict) -> list[Path]:
         if cs is None:
             continue
         rgb, mask = cs
+        if not _looks_like_sprite(rgb, mask):
+            continue
         if any(_same_sprite(rgb, mask, p) for p in have):
             continue
         k = 0
@@ -861,6 +865,15 @@ def learn_card_sprites(pic: np.ndarray, state: dict) -> list[Path]:
         global _battle_tpls
         _battle_tpls = None
     return saved
+
+
+def _looks_like_sprite(rgb: np.ndarray, mask: np.ndarray) -> bool:
+    """False for cut-outs that are not a whole monster: mostly black outline (the panel fill
+    leaked into the sprite) or pure grey (a greyed-out card), which would make bad templates."""
+    px = rgb[mask].astype(int)
+    if (px.max(axis=1) < 70).mean() > 0.75:      # dark monsters like Coalem reach ~0.57
+        return False
+    return int((px.max(axis=1) - px.min(axis=1)).max()) > 4
 
 
 def _same_sprite(rgb: np.ndarray, mask: np.ndarray, path: Path) -> bool:

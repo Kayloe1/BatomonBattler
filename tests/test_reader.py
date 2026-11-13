@@ -227,6 +227,27 @@ class CardSprites(unittest.TestCase):
                 rgb, mask = got
                 self.assertGreater(mask.mean(), 0.2, card["name"])
 
+    def test_tall_sprite_keeps_its_inside(self):
+        # Electranade's fuse pokes above the sprite rows; the panel fill used to eat its body
+        name = "unread_20261112_210439_659871.png"
+        pic = _canonical(name)
+        if pic is None:
+            self.skipTest(f"captures/{name} not here")
+        rgb, mask = reader.card_sprite(pic, 0)
+        self.assertTrue(reader._looks_like_sprite(rgb, mask))
+        self.assertLess((rgb[mask].max(axis=1) < 70).mean(), 0.5)
+
+    def test_outline_and_grey_cutouts_are_not_learned(self):
+        import numpy as np
+        mask = np.ones((20, 20), bool)
+        outline = np.zeros((20, 20, 3), np.uint8)
+        grey = np.full((20, 20, 3), 128, np.uint8)
+        colour = grey.copy()
+        colour[..., 0] = 200
+        self.assertFalse(reader._looks_like_sprite(outline, mask))
+        self.assertFalse(reader._looks_like_sprite(grey, mask))
+        self.assertTrue(reader._looks_like_sprite(colour, mask))
+
 
 if __name__ == "__main__":
     unittest.main()
