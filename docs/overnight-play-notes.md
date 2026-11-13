@@ -103,6 +103,26 @@ Stops fixed on the way, each with a test:
   Logged battles the simulator can check went from 4 to 12 (agrees on 11). Older logs still miss the
   opponent's back row (no scrolled picture); new runs will not.
 
+### Afternoon of 2026-11-13 (Swim Coach run, branch claude/casual-runs)
+- **Shop lock**: the old rule locked whenever one card was a little too dear (judged against having $0),
+  and the next morning the bot bought the locked card after only 5 of 18 locks. `_lock_choice` now runs
+  tomorrow's first decision (tomorrow's money, these cards) and locks only if its best buy is a card that
+  is too dear today and beats a fresh shop. Replayed on the 18 logged locks: 7 kept.
+- **Unknown monsters** (e.g. an event's foreign Jinto monster): they play as the `Unknown Rare` stand-in
+  (data/stand_in_monsters.csv: own badges, Rare-typical 5.0 s, no passive) so they can be fielded or sold.
+  Before, an unnamed monster could do neither and blocked a bench slot for the run.
+- **Learning them**: on the shop screen the bot hovers each unnamed monster once and reads the info panel
+  (`reader.read_info_panel`: name and rarity in the caps font, type, cooldown, active numbers by line
+  colour). A new name goes into data/foreign_monsters.csv with the panel picture for its passive
+  (`learn_monsters.py`); the sprite is saved either way. Passives are read by a person from the picture.
+- Pyrokami (Jinto Rare, Fire, 3.6 s, Deal 5 + Burn 5, On Cast +10 Burn) added by hand from its panel,
+  with its passive in the simulator.
+- The event "Gain a foreign Rare monster" is scored from the learned Jinto Rares (event-only monsters
+  are marked `event_only` and left out), not a fixed guess.
+- Dead weight never sells a bench monster that the arrangement puts on the team (it used to).
+- Title screen: recognised without its blinking label, and clicked again while the intro ignores clicks.
+- Overflow is accepted after a trinket pick, result, cash-in or continue (Swim Coach's daily Water monster).
+
 Done later in the night: Purple Egg named on team/bench (kept out of battle matching), Mirror / Glimmer /
 Legendary Potions modelled, and `Params.grow_next` (tomorrow is scored with one battle's permanent growth).
 
