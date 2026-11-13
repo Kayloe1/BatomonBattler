@@ -368,6 +368,35 @@ def item_outcomes(s: RunState, i: int) -> list[RunState]:
             if _add_unit(u, replace(new_unit(sp.name, 0, 2), sell_value=0)):
                 outs.append(u)
         return outs
+    if name == "Glimmer Potion":                # "All monsters in your shop this turn are SHINY"
+        t.items_left -= 1
+        t.shop = [replace(c, shiny=True) if c and c.kind == "monster" else c for c in t.shop]
+        return [t]
+    if name == "Mirror Potion":                 # "Roll a shop that contains only monsters on your team and bench"
+        t.items_left -= 1
+        names = sorted({u.name for _, _, u in t.owned() if u.species and not u.species.foreign})
+        if not names:
+            return [t]
+        rng = random.Random(sum(map(ord, "".join(names))) + t.day)     # stable across processes
+        outs = []
+        for _ in range(3):
+            u = t.copy()
+            u.shop = [Card(n, data.species(n).cost, "monster", (), data.species(n).rarity)
+                      for n in rng.choices(names, k=5)]
+            outs.append(u)
+        return outs
+    if name == "Legendary Potion":              # fill every empty team and bench slot, no sell value
+        t.items_left -= 1
+        pool = sorted(data.by_rarity("Legendary"), key=lambda sp: sp.name)
+        rng = random.Random(t.day * 31 + len(pool))
+        outs = []
+        for _ in range(3):
+            u = t.copy()
+            while _first_free(u) is not None:
+                sp = rng.choice(pool)
+                _add_unit(u, replace(new_unit(sp.name, 0), sell_value=0))
+            outs.append(u)
+        return outs
     if name == "Shiny Potion":                  # a random monster (bench included) turns Shiny
         t.items_left -= 1
         outs = []
@@ -382,7 +411,8 @@ def item_outcomes(s: RunState, i: int) -> list[RunState]:
 def use_item(s: RunState, i: int, rng: random.Random | None = None) -> RunState:
     card = s.shop[i]
     if card.name in ("Voucher", "Apex Bait", "Lootbox", "Recruiting Flyer", "Gold Powder", "Basic Candy",
-                     "Rare Candy", "Ultra Candy", "Summon Potion", "Shiny Potion") or card.name in GIFT_ITEMS:
+                     "Rare Candy", "Ultra Candy", "Summon Potion", "Shiny Potion", "Glimmer Potion",
+                     "Mirror Potion", "Legendary Potion") or card.name in GIFT_ITEMS:
         outs = item_outcomes(s, i)
         if not outs:                      # nothing to act on: the item is just spent
             t = s.copy()
@@ -461,7 +491,8 @@ MODELLED_ITEMS = {"Cake", "Feast", "Pom Berry", "Coupon", "Fake Coin", "Lucky Co
                   "Blue Ticket", "Purple Ticket", "Golden Ticket", "Coffee",
                   "Voucher", "Apex Bait", "Basic Candy", "Rare Candy", "Lootbox", "Recruiting Flyer",
                   "Gold Powder", "Dowsing Rod", "Purple Gift", "Golden Gift",
-                  "Ultra Candy", "Summon Potion", "Shiny Potion", "Gold Potion", "Growth Potion"}
+                  "Ultra Candy", "Summon Potion", "Shiny Potion", "Gold Potion", "Growth Potion",
+                  "Glimmer Potion", "Mirror Potion", "Legendary Potion"}
 
 
 def item_is_worth_using(s: RunState, card: Card) -> bool:
