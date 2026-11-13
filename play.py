@@ -27,6 +27,7 @@ import sys
 from datetime import datetime
 
 import hands as hands_mod
+import learn_monsters
 
 try:
     from engine.explain import explain
@@ -186,6 +187,7 @@ def main(argv=None) -> int:
     last_shop_state: dict | None = None
     played = False          # True once this session has acted inside a run
     last_shop: dict | None = None
+    tried_unknown: set = set()  # unnamed monsters already hovered (learn_monsters)
     seen_notes: list[str] = []
     while True:
         state = h.look()
@@ -214,6 +216,15 @@ def main(argv=None) -> int:
                 log("event_outcome", **pending_event, **event_outcome(pending_event.pop("_before"), state))
                 pending_event = None
             learn_sprites(h, state)
+            if not h.dry_run:
+                try:
+                    lines = learn_monsters.learn_unknown(h, state, tried_unknown)
+                except Exception as e:          # never stop a run over this
+                    lines = [f"could not inspect an unknown monster: {type(e).__name__}: {e}"]
+                if lines:
+                    think(lines)
+                    log("learn_monster", lines=lines)
+                    continue                    # look again: the monster may have a name now
             if brain is None:
                 i = choose_purchase(state)
                 if i is not None:

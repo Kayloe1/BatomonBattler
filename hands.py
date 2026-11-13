@@ -23,6 +23,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from PIL import Image
+
 import reader
 import window
 
@@ -209,6 +211,31 @@ class Hands:
             pyautogui.mouseUp()
             pyautogui.moveTo(*self.screen_point(PARK), duration=0.15)
         return [["click", x, y]]
+
+    def inspect(self, where: str, i: int) -> dict | None:
+        """Hover a team/bench monster and read the info panel that slides in on the right
+        (name, rarity, type, cooldown, active numbers). The panel picture is saved in
+        captures/info_panels/ so its passive can be read by a person. None if no panel showed."""
+        import numpy as np
+        box = reader.team_slot(i) if where == "team" else reader.bench_slot(i)
+        if self.dry_run:
+            return None
+        import pyautogui
+        self._focus()
+        pyautogui.moveTo(*self.screen_point(box), duration=0.15)
+        time.sleep(0.8)
+        self.look(save_if_unreadable=False)
+        pic = np.asarray(window.canonical_picture(self.last_image))
+        pyautogui.moveTo(*self.screen_point(PARK), duration=0.15)
+        panel = reader.read_info_panel(pic)
+        if panel is not None:
+            folder = CAPTURE_DIR / "info_panels"
+            folder.mkdir(parents=True, exist_ok=True)
+            path = folder / f"{panel.get('name') or 'unread'}_{datetime.now():%Y%m%d_%H%M%S}.png"
+            Image.fromarray(pic).save(path)
+            panel["capture"] = str(path.relative_to(CAPTURE_DIR.parent)).replace("\\", "/")
+            panel["slot_rgb"] = reader.crop(pic, box)
+        return panel
 
     def _drag(self, src: reader.Box, dst: reader.Box) -> list:
         x0, y0 = self.screen_point(src)

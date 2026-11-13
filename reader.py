@@ -526,6 +526,82 @@ def detect_screen(pic: np.ndarray) -> str:
     return "unknown"
 
 
+# ---- Info panel: hovering a monster on the shop screen shows its card on the right ----
+INFO_TITLE: Box = (1925, 182, 2545, 238)        # blue bar: NAME ... $sell RARITY
+INFO_NAME: Box = (1935, 188, 2300, 232)
+INFO_RARITY: Box = (2440, 188, 2540, 232)
+INFO_TYPE: Box = (2240, 356, 2400, 400)          # white word on the type badge (one type seen so far)
+INFO_COOLDOWN: Box = (1990, 575, 2080, 630)      # "3.6" above "sec", dark grey
+INFO_ACTIVE: Box = (2130, 580, 2500, 690)        # coloured lines: "Deal 5 damage", "Burn 5"
+INFO_PASSIVE: Box = (1950, 760, 2520, 1010)      # "On Cast" + text; read by eye from the saved picture
+INFO_PANEL: Box = (1900, 170, 2560, 1050)
+INFO_DARK = (82, 82, 90)
+# Active-line colour (same as the Stats window's) -> the stat it gives
+INFO_LINE_STAT = {"dealt": "damage", "healed": "heal", "inflicted": "poison", "inflicted_shock": "shock",
+                  "inflicted_burn": "burn", "shielded": "shield"}
+TYPE_NAMES = ["Bug", "Dark", "Dragon", "Electric", "Fairy", "Fire", "Flying", "Grass", "Ice", "Normal",
+              "Psychic", "Rock", "Steel", "Toxic", "Water", "Ghost", "Fighting", "Ground", "Light"]
+
+
+def is_info_panel(pic: np.ndarray) -> bool:
+    """The hover panel is showing: its blue title bar and white body."""
+    return bool(_near(pic[200, 2300], (0, 132, 189), 12) and _near(pic[300, 1990], (255, 255, 255), 6)
+                and _near(pic[200, 1960:2500], (0, 132, 189), 12).mean() > 0.3)
+
+
+def _match_masked(read: str, names: list[str]) -> str | None:
+    """The one name that fits a read word where '?' is any letter ("?IRE" -> Fire); stray marks
+    from a badge edge ("? ?IRE") are dropped first."""
+    import re
+    words = [w for w in read.split() if len(w.strip("?")) >= 2]
+    for w in words:
+        rx = re.compile("^" + re.escape(w).replace(r"\?", ".") + "$")
+        hits = [n for n in names if rx.match(n.upper())]
+        if len(hits) == 1:
+            return hits[0]
+    return None
+
+
+def read_info_panel(pic: np.ndarray) -> dict | None:
+    """The hovered monster's card: {"name", "rarity", "type", "cooldown", "stats", "raw"} or None.
+
+    Learned 2026-11-13 from Pyrokami (a Jinto monster an event gave). The name and rarity are in the
+    "caps" font; the active lines use the Stats window's colours and digits; the passive is not read
+    (its words are mostly unknown glyphs), so the caller saves the panel picture for a person to read."""
+    if not is_info_panel(pic):
+        return None
+    s = store()
+    raw = {}
+    raw["name"] = s.read("caps", glyphs.white(crop(pic, INFO_NAME)), space_gap=7).strip()
+    raw["rarity"] = s.read("caps", glyphs.white(crop(pic, INFO_RARITY)), space_gap=7).strip()
+    raw["type"] = s.read("caps", glyphs.white(crop(pic, INFO_TYPE)), space_gap=7).strip()
+    name = resolve(raw["name"].title(), MONSTER_NAMES) or (raw["name"].title() if "?" not in raw["name"] else None)
+    rarity = next((r for r in RARITIES if r.upper() == raw["rarity"]), None)
+    mtype = _match_masked(raw["type"], TYPE_NAMES)
+    # cooldown: digits plus a small dot glyph
+    cd_mask = _near(crop(pic, INFO_COOLDOWN), INFO_DARK, 20)
+    cd = ""
+    for g in glyphs.segment(cd_mask, min_pixels=4):
+        if g.bitmap.sum() < 60 and g.bitmap.shape[0] < 14:
+            cd += "."
+        else:
+            cd += s.classify("statsdigit", g.bitmap)[0]
+    raw["cooldown"] = cd
+    try:
+        cooldown = float(cd)
+    except ValueError:
+        cooldown = None
+    stats: dict[str, int] = {}
+    for kind, words in _stats_bands(crop(pic, INFO_ACTIVE)):
+        stat = INFO_LINE_STAT.get(kind)
+        for w in words:
+            txt = "".join(s.classify("statsdigit", g.bitmap)[0] for g in w)
+            if stat and txt.isdigit():
+                stats[stat] = int(txt)
+    raw["stats"] = dict(stats)
+    return {"name": name, "rarity": rarity, "type": mtype, "cooldown": cooldown, "stats": stats, "raw": raw}
+
+
 def is_stats_window(pic: np.ndarray) -> bool:
     """The Stats window, scrolled or not: the pink title bar and the red close button, which do not scroll.
 
