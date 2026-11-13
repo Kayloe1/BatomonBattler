@@ -11,6 +11,10 @@ from engine.evaluate import Evaluator
 from engine.model import BENCH, TEAM, Card, RunState, new_unit
 from engine.planner import power, Params, Planner, drag_works, moves_to
 
+# The tests must not change as real opponents are recorded: point the engine at a file that is not there.
+opponents.RECORDED = opponents.RECORDED.with_name("no_recorded_opponents_in_tests.jsonl")
+opponents._CACHE.clear()
+
 FAST = Params(k_final=4, k_quick=3, reroll_samples=1, greedy_steps=1, final_rounds=1)
 
 
@@ -300,6 +304,43 @@ class ItemsAreModelled(unittest.TestCase):
         shop = model.random_shop(8, random.Random(4))
         self.assertEqual(shop[4].kind, "item")
 
+    def test_gentleman_shop_has_no_cheap_monsters_from_day_4(self):
+        cheap = {"Common", "Uncommon"}
+        rng = random.Random(7)
+        late = [c for _ in range(40) for c in model.random_shop(5, rng, "Gentleman")[:4]]
+        self.assertFalse([c.name for c in late if c.rarity in cheap])
+        early = [c for _ in range(40) for c in model.random_shop(2, rng, "Gentleman")[:4]]
+        self.assertTrue(any(c.rarity in cheap for c in early))
+        other = [c for _ in range(40) for c in model.random_shop(5, rng, "Witch")[:4]]
+        self.assertTrue(any(c.rarity in cheap for c in other))
+        # a reroll passes the day, and odds read from the screen are used as they are
+        s = RunState(day=6, rank=6, money=100, trainer="Gentleman")
+        for _ in range(20):
+            self.assertFalse([c.name for c in model.reroll(s, rng).shop[:4] if c.rarity in cheap])
+        read = model.random_shop(5, rng, "Gentleman", odds=(100, 0, 0, 0, 0))
+        self.assertTrue(all(c.rarity == "Common" for c in read[:4]))
+
+    def test_no_items_are_planned_after_the_game_refused_one_today(self):
+        from engine.bot import Brain
+        b = Brain(Params(), pool_size=4)
+        b.memory = {"trinkets": []}
+        st = {"day": 3, "shop": [None] * 5, "team": [None] * 6, "bench": [None] * 4, "money": 5}
+        self.assertEqual(model.from_reader(st, b.memory).items_left, 1)
+        b.note_action("items_done", st)
+        self.assertEqual(model.from_reader(st, b.memory).items_left, 0)
+        self.assertEqual(model.from_reader({**st, "day": 4}, b.memory).items_left, 1)
+        b.note_action("reroll", {**st, "day": 4})          # a new day clears it
+        self.assertFalse(b.memory["items_done"])
+
+    def test_the_wait_after_a_fade_accepts_every_screen_the_loop_handles(self):
+        import re
+        from pathlib import Path
+        import play
+        src = Path(play.__file__).read_text(encoding="utf-8")
+        loop = src[src.index("while True:"):]
+        handled = set(re.findall(r'"([a-z_]+)"', " ".join(re.findall(r"if screen (?:==|in) (.*?):\n", loop))))
+        self.assertEqual(handled - {"blank", "matchmaking", "battle"}, play.AFTER_WAIT)
+
     def test_paid_item_is_weighed_and_found_useful(self):
         p = small_planner()
         s = RunState(day=8, rank=8, money=120, shop=[None, None, None, None, item("Basic Candy")])
@@ -463,3 +504,44 @@ class PairBonus(unittest.TestCase):
         early = p.third_copy_chance(RunState(day=1, rank=1), "Mosslug")
         self.assertGreater(early, common)                  # Commons are rare in late shops
         self.assertEqual(p.third_copy_chance(s, "Pyrokami"), 0.0)   # foreign: never in the shop
+
+
+class RecordedOpponents(unittest.TestCase):
+    def case(self, slots, day=3):
+        return {"day": day, "source": "test", "b": {"slots": slots}}
+
+    def test_a_logged_opponent_becomes_a_pool_entry(self):
+        mag = {"name": "Magmite", "level": 1, "stats": {"shield": 40, "burn": 4}}
+        spec = opponents.from_case(self.case([None, mag, None, None, None, None]))
+        self.assertEqual((spec["day"], spec["hp"], spec["unnamed"]), (3, data.hp_for_day(3), 0))
+        self.assertEqual(spec["slots"][1], mag)
+
+    def test_unnamed_monsters_play_as_the_stand_in_up_to_a_limit(self):
+        mag = {"name": "Magmite", "level": 1, "stats": {"shield": 40, "burn": 4}}
+        who = {"name": None, "level": 2, "stats": {"damage": 60}}
+        spec = opponents.from_case(self.case([mag, who, who, None, None, None]))
+        self.assertEqual(spec["unnamed"], 2)
+        self.assertEqual(spec["slots"][1], {"name": data.STAND_IN, "level": 2, "stats": {"damage": 60}})
+        self.assertIsNone(opponents.from_case(self.case([mag, who, who, who, None, None])))
+        self.assertIsNone(opponents.from_case(self.case([None] * 6)))
+        self.assertIsNone(opponents.from_case(self.case([{"name": "Nosuchmon", "level": 1, "stats": {"damage": 5}}])))
+
+    def test_recorded_teams_join_the_pool_once_and_leave_room_for_ghosts(self):
+        import tempfile
+        from pathlib import Path
+        old = opponents.RECORDED
+        with tempfile.TemporaryDirectory() as d:
+            opponents.RECORDED = Path(d) / "rec.jsonl"
+            try:
+                teams = [opponents.from_case(self.case(
+                    [{"name": "Magmite", "level": 1, "stats": {"shield": 40, "burn": n}}])) for n in (4, 5, 6)]
+                self.assertEqual([opponents.add_recorded(3, t) for t in teams + teams[:1]],
+                                 [True, True, True, False])
+                pool = opponents.pools(n=4, seed=1)[3]
+                self.assertEqual([p["skill"] == "recorded" for p in pool],
+                                 [True, False, True, False, True, False, False])
+                self.assertEqual(pool[0]["slots"], teams[2]["slots"])        # newest first
+                self.assertFalse(any(p["skill"] == "recorded" for p in opponents.pools(n=4, seed=1, recorded=False)[3]))
+            finally:
+                opponents.RECORDED = old
+                opponents._CACHE.clear()

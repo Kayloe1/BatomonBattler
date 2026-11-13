@@ -61,7 +61,7 @@ def _job(args):
     saved = {k: rules.SETTINGS[k] for k in overrides}
     rules.SETTINGS.update(overrides)
     try:
-        src = OppSource(ghosts=opponents.pools(n=48, seed=pool_seed), p_ghost=1, p_league=0, p_recorded=0)
+        src = OppSource(ghosts=opponents.pools(n=48, seed=pool_seed, recorded=False), p_ghost=1, p_league=0, p_recorded=0)
         pol = make_policy(name)
         return [play_run(pol, s, src) for s in seeds]
     finally:
@@ -84,7 +84,7 @@ def evaluate(name: str, runs: int, overrides: dict | None = None, pool_seed: int
 
 def describe_run(name: str, seed: int) -> None:
     pol = make_policy(name)
-    src = OppSource(ghosts=opponents.pools(n=48, seed=HOLDOUT_SEED), p_ghost=1, p_league=0, p_recorded=0)
+    src = OppSource(ghosts=opponents.pools(n=48, seed=HOLDOUT_SEED, recorded=False), p_ghost=1, p_league=0, p_recorded=0)
     r = play_run(pol, seed, src, snapshots=True)
     print(f"  seed {seed}: {r['arc']}  ({r['badges']} badges)")
     for d in (3, 5, 7, 9):

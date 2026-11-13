@@ -34,6 +34,7 @@ CAPTURE_DIR = ROOT / "captures"
 
 PARK = (2300, 640, 2340, 680)     # empty background: the pointer rests here, hovering nothing
 SETTLE_S = 0.6                    # wait after an action before capturing again
+ITEM_STILL_THERE = "the item card is still there"     # check_buy: an item click changed nothing
 
 
 @dataclass
@@ -68,7 +69,7 @@ def check_buy(before: dict, after: dict, i: int) -> str | None:
         if after["money"] < before["money"] - card["price"]:
             return f"money went {before['money']} -> {after['money']}, more than the price"
         if after["shop"][i] == card:
-            return "the item card is still there"
+            return ITEM_STILL_THERE
         return None
     if after["money"] != before["money"] - card["price"]:
         return f"money went {before['money']} -> {after['money']}, expected -{card['price']}"
