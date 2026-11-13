@@ -453,3 +453,13 @@ class MergePlacement(unittest.TestCase):
         team2, bench2 = p.place(t, team, bench)
         self.assertNotIn(None, team2)
         self.assertIn(("Noxnimbus", 2), [(u.name, u.level) for u in team2])
+
+
+class PairBonus(unittest.TestCase):
+    def test_a_rarer_third_copy_is_less_likely(self):
+        p = small_planner()
+        s = RunState(day=10, rank=10)
+        common = p.third_copy_chance(s, "Mosslug")
+        early = p.third_copy_chance(RunState(day=1, rank=1), "Mosslug")
+        self.assertGreater(early, common)                  # Commons are rare in late shops
+        self.assertEqual(p.third_copy_chance(s, "Pyrokami"), 0.0)   # foreign: never in the shop

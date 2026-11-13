@@ -157,7 +157,22 @@ class Planner:
         return self.ev.score(team, s.day, k or self.p.k_final, hp=self._hp(s, s.day), trainer=s.trainer,
                              trinkets=s.trinkets).win
 
-    def extras(self, s: RunState, bench: list[Unit | None]) -> float:
+    # Cards a run sees before the next day or two: ~4 monster cards a shop, a few shops a day, two days.
+    CARDS_AHEAD = 32
+
+    def third_copy_chance(self, s: RunState, name: str) -> float:
+        """Chance that one more copy of `name` shows up in the shops of the next day or two.
+        Rarer monsters are less likely: a Super Rare at 20% odds among 13 Super Rares is ~1.5% a card."""
+        sp = data.species(name)
+        if sp is None or sp.foreign:
+            return 0.0
+        odds = s.odds or data.rank_odds(s.rank)
+        r = data.RARITIES.index(sp.rarity)
+        n = max(1, len(data.by_rarity(sp.rarity)))
+        p_card = (odds[r] / 100.0) / n
+        return 1.0 - (1.0 - p_card) ** self.CARDS_AHEAD
+
+    def extras(self, s: RunState, bench: list[Unit | None], team: list[Unit | None] | None = None) -> float:
         # money and what the monsters would sell for, counted up to a cap: beyond it,
         # saved money buys nothing that today's spending could not
         resale = sum(u.sell_price() for _, _, u in s.owned())
@@ -167,14 +182,23 @@ class Planner:
         for _, _, u in s.owned():
             if u.level == 1 and u.name:
                 counts[u.name] = counts.get(u.name, 0) + 1
+        fielded = [u for u in (team or []) if u is not None]
+        weakest = min((power(u) for u in fielded), default=0.0) if len(fielded) >= 6 else 0.0
         for name, c in counts.items():
             if c >= 2:
                 sp = data.species(name)
-                v += self.p.copy_progress * (1 + data.RARITIES.index(sp.rarity) if sp else 1)
+                # a pair is worth its level-up only if the third copy is likely to show up and the
+                # level-2 monster would play (2026-11-13: a second Dracana bought for $40 for this
+                # bonus alone, and the pair sat on the bench; the bonus grew with rarity although a
+                # rarer third copy is less likely)
+                if power(model.new_unit(name, 0, 2)) <= weakest:
+                    continue
+                v += (self.p.copy_progress * (1 + data.RARITIES.index(sp.rarity) if sp else 1)
+                      * self.third_copy_chance(s, name))
         return v
 
     def quick(self, s: RunState, team, bench) -> float:
-        v = self.team_score(s, team, self.p.k_quick) + self.extras(s, bench)
+        v = self.team_score(s, team, self.p.k_quick) + self.extras(s, bench, team)
         if self.p.power_weight:
             v += self.p.power_weight * math.log1p(sum(power(u) for u in team if u is not None))
         return v
