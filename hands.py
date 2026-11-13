@@ -690,8 +690,12 @@ class Hands:
 
     def pick_trinket(self, k: int) -> Result:
         """Click trinket card k (0 = left). The shop comes back, or another gift."""
+        # k counts the cards on show; a single card sits in the middle place (2026-11-13)
+        state = self.look()
+        places = state.get("card_places") or [0, 1, 2]
+        place = places[k] if k < len(places) else k
         # a new day's monster (Swim Coach: a Water monster each day) can arrive with team and bench full
-        return self._press_and_wait(f"pick trinket {k}", "trinket_pick", reader.trinket_card(k),
+        return self._press_and_wait(f"pick trinket {k}", "trinket_pick", reader.trinket_card(place),
                                     {"shop", "gift_box", "overflow"}, 20)
 
     def choose_event(self, k: int) -> Result:  # may be followed by "select_target"

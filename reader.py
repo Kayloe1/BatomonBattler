@@ -109,8 +109,9 @@ SCREENS: dict[str, list[tuple[int, int, tuple[int, int, int]]]] = {
                  (1229, 768, (104, 64, 24)), (1400, 800, (200, 64, 40))],
     # "Select a trinket.": trinket cards over the dimmed shop, HIDE on the left
     # (over plain black after an event's gift): so the white card faces and the pink TRINKET tag
-    "trinket_pick": [(100, 1215, BLUE), (460, 1300, PINK), (560, 320, (255, 255, 255)),
-                     (1280, 320, (255, 255, 255)), (600, 460, (233, 206, 228))],
+    # (a single trinket, e.g. a Super Rare gift, sits in the middle card's place: so the middle card)
+    "trinket_pick": [(100, 1215, BLUE), (460, 1300, PINK), (1280, 320, (255, 255, 255)),
+                     (1320, 460, (233, 206, 228))],
     # Trainer pick: three yellow card headers over the "Select a trainer" box
     "trainer_pick": [(820, 222, YELLOW), (1483, 222, YELLOW), (2146, 222, YELLOW), (460, 1300, PINK),
                      (100, 1215, (14, 14, 14))],
@@ -484,14 +485,17 @@ def trinket_name_mask(pic: np.ndarray, i: int) -> np.ndarray | None:
 
 def read_trinket_pick(pic: np.ndarray) -> dict:
     """How many trinket cards are offered, and their names where readable."""
-    names = []
+    names, places = [], []
     for i in range(3):
         mask = trinket_name_mask(pic, i)
         if mask is None:
             continue
         text = store().read("caps", mask, space_gap=6)
         names.append(resolve(text, TRINKET_NAMES, ignore_case=True))
-    return {"trinkets": names, "problems": [] if names else ["trinket pick: no cards found"]}
+        places.append(i)
+    # "card_places": where each offered card sits (0 left, 1 middle, 2 right); one card sits in the middle
+    return {"trinkets": names, "card_places": places,
+            "problems": [] if names else ["trinket pick: no cards found"]}
 
 
 # ---- Trainer pick: three trainer cards, click one ----

@@ -109,6 +109,7 @@ class ScreenDetection(unittest.TestCase):
         "gift_box_after_event.png": "gift_box",
         "title_screen_no_label.png": "title",
         "trinket_pick_after_event.png": "trinket_pick",
+        "trinket_pick_single.png": "trinket_pick",
         "trinket_pick.png": "trinket_pick",
         "shop_day1_broke.png": "shop",          # REROLL button is grey here ($0)
     }
