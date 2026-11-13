@@ -1046,9 +1046,13 @@ def _read_battle_slot(pic: np.ndarray, side: int, i: int, problems: list[str]) -
     # "LV", ".", digit: the digit is the third piece (a sprite pixel of the label colour can follow it)
     level_text = store().classify("level", parts[2].bitmap)[0] if len(parts) >= 3 else ""
     level = _to_int(level_text)
+    badges = read_stat_badges(pic, owned_badge_band(box))
+    if not parts and not badges:
+        # no "LV." label and no badges: an empty slot with a small marker in it (a yellow crown in
+        # a team slot, 2026-11-13), not a monster
+        return None
     if level is None:
         problems.append(f"{where}: cannot read level ('{level_text}')")
-    badges = read_stat_badges(pic, owned_badge_band(box))
     if any(b["value"] is None for b in badges):
         problems.append(f"{where}: cannot read a stat badge")
     name, dist = match_battle_sprite(pic, box, mirrored=side == 1)
@@ -1342,9 +1346,13 @@ def _read_owned_slot(pic: np.ndarray, box: Box, where: str, problems: list[str])
     # "LV", ".", digit: the digit is the third piece (a sprite pixel of the label colour can follow it)
     level_text = store().classify("level", parts[2].bitmap)[0] if len(parts) >= 3 else ""
     level = _to_int(level_text)
+    badges = read_stat_badges(pic, owned_badge_band(box))
+    if not parts and not badges:
+        # no "LV." label and no badges: an empty slot with a small marker in it (a yellow crown in
+        # a team slot, 2026-11-13), not a monster
+        return None
     if level is None:
         problems.append(f"{where}: cannot read level ('{level_text}')")
-    badges = read_stat_badges(pic, owned_badge_band(box))
     if any(b["value"] is None for b in badges):
         problems.append(f"{where}: cannot read a stat badge")
     name, dist = match_sprite(rgb)
