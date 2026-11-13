@@ -103,8 +103,10 @@ SCREENS: dict[str, list[tuple[int, int, tuple[int, int, int]]]] = {
     "result": [(100, 1215, BLUE), (460, 1300, PINK), (2300, 1215, RED)],
     # Event with up to three choices: SHOW TEAM (left), nothing on the right
     "event": [(100, 1215, BLUE), (460, 1300, PINK), (2300, 1215, (14, 14, 14)), (300, 600, (14, 14, 14))],
-    # "<monster> leveled up! ... gives you a gift.": a gift box over the dimmed shop
-    "gift_box": [(100, 1215, (19, 19, 21)), (2300, 1215, (19, 19, 21)), (460, 1300, PINK), (1300, 215, (55, 41, 2))],
+    # "<monster> gives you a gift.": the gift box itself, over the dimmed shop (after a level-up)
+    # or over plain black (after an event); so the box's colours, not the background
+    "gift_box": [(460, 1300, PINK), (1150, 800, (248, 112, 88)), (1350, 800, (224, 152, 72)),
+                 (1229, 768, (104, 64, 24)), (1400, 800, (200, 64, 40))],
     # "Select a trinket.": trinket cards over the dimmed shop, HIDE on the left
     "trinket_pick": [(100, 1215, BLUE), (2300, 1215, (19, 19, 21)), (460, 1300, PINK), (1300, 215, (55, 41, 2))],
     # Trainer pick: three yellow card headers over the "Select a trainer" box
@@ -523,11 +525,12 @@ def detect_screen(pic: np.ndarray) -> str:
 
 
 def is_stats_window(pic: np.ndarray) -> bool:
-    """The Stats window, scrolled or not: its pink title and grey frame, which do not scroll.
+    """The Stats window, scrolled or not: the pink title bar and the red close button, which do not scroll.
 
-    detect_screen also checks the first yellow header at y=270, which scrolls out of view.
+    detect_screen also checks the first yellow header at y=270 and the scrollbar track at x=2300,
+    and both change once the window is scrolled (the header leaves, the yellow handle arrives).
     """
-    pts = [SCREENS["stats"][0], SCREENS["stats"][2]]
+    pts = [SCREENS["stats"][0], (300, 140, PINK), (2253, 186, (189, 41, 74)), (2272, 155, (255, 255, 255))]
     return all(_near(pic[y, x], colour, SCREEN_TOL) for x, y, colour in pts)
 
 

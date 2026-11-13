@@ -119,3 +119,17 @@ class BattleSpriteRule(unittest.TestCase):
         self.assertTrue(reader._battle_match_ok(63, 82))      # Spinarai with an effect on it
         self.assertFalse(reader._battle_match_ok(60, 73))     # Aristobat on a Shiny monster: wrong
         self.assertFalse(reader._battle_match_ok(70, 140))    # too far from anything
+
+
+class ScrolledStats(unittest.TestCase):
+    def test_scrolled_window_gives_all_six_opponents(self):
+        # the first real scrolled picture: the yellow scroll handle covers the old frame point
+        top, bottom = "battles/20261113_085236_stats_top.png", "battles/20261113_085236_stats_bottom.png"
+        if not (ROOT / "captures" / bottom).exists():
+            self.skipTest("captures not here")
+        a, b = pic(top), pic(bottom)
+        self.assertTrue(reader.is_stats_window(b))
+        r = reader.read_stats(a, b)
+        self.assertEqual(r["problems"], [])
+        self.assertEqual(r["opponent_team"][3], {"inflicted": {"Poison": 6}, "triggered": 6})
+        self.assertEqual(r["opponent_team"][4], {"healed": 140, "inflicted": {"Poison": 161}, "triggered": 14})
