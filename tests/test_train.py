@@ -11,6 +11,10 @@ from train.env import OppSource, play_run
 from train.learn import learn
 from train.policy import NAMES, SPEC, FastPolicy, Theta, theta_from_vec, vec_from_theta
 
+# The tests must not change as real opponents are recorded: point the engine at a file that is not there.
+opponents.RECORDED = opponents.RECORDED.with_name("no_recorded_opponents_in_tests.jsonl")
+opponents._CACHE.clear()
+
 
 def card(name):
     sp = data.species(name)

@@ -149,7 +149,8 @@ def ghost_run(seed: int, days: int, skill: str) -> list[dict]:
     return out
 
 
-def build_pools(n: int = 48, days: int = 15, seed: int = 1, mix: dict | None = None) -> dict[int, list[dict]]:
+def build_pools(n: int = 48, days: int = 15, seed: int = 1, mix: dict | None = None,
+                recorded: bool = True) -> dict[int, list[dict]]:
     """n opponents for every day. The order is shuffled once, so the first k of a
     pool are a fair sample of the mix (the evaluator often uses only the first k)."""
     mix = mix or POOL_MIX
@@ -165,14 +166,25 @@ def build_pools(n: int = 48, days: int = 15, seed: int = 1, mix: dict | None = N
     for j, skill in enumerate(skills):
         for spec in ghost_run(seed * 100_003 + j, days, skill):
             pools[spec["day"]].append(spec)
-    for d, recs in load_recorded().items():
-        if d in pools:
-            pools[d] = recs + pools[d]
+    if recorded:
+        for d, recs in load_recorded().items():
+            if d in pools:
+                pools[d] = _interleave(recs[::-1], pools[d])       # newest real teams first
     return pools
 
 
+def _interleave(real: list[dict], ghosts: list[dict]) -> list[dict]:
+    """real, ghost, real, ghost ... then whatever is left. The evaluator scores against the first k
+    of a pool, so real teams are always in the sample but never push every ghost out of it (a
+    handful of teams met by chance is a narrow sample of who can turn up)."""
+    out: list[dict] = []
+    for i in range(max(len(real), len(ghosts))):
+        out += real[i:i + 1] + ghosts[i:i + 1]
+    return out
+
+
 def load_recorded() -> dict[int, list[dict]]:
-    """Real opponent teams logged by the bot (one JSON object per line, with 'day')."""
+    """Real opponent teams logged by the bot (one JSON object per line, with 'day'), oldest first."""
     out: dict[int, list[dict]] = {}
     if RECORDED.exists():
         for line in RECORDED.read_text(encoding="utf-8").splitlines():
@@ -182,17 +194,87 @@ def load_recorded() -> dict[int, list[dict]]:
     return out
 
 
-def add_recorded(day: int, team: dict) -> None:
+def add_recorded(day: int, team: dict) -> bool:
+    """Append a real opponent team; False when the same team on the same day is already there."""
+    slots = team.get("slots")
+    if any(r.get("slots") == slots for r in load_recorded().get(int(day), [])):
+        return False
     RECORDED.parent.mkdir(parents=True, exist_ok=True)
     with open(RECORDED, "a", encoding="utf-8") as f:
-        f.write(json.dumps({**team, "day": day}) + "\n")
+        f.write(json.dumps({**team, "day": int(day)}) + "\n")
+    _CACHE.clear()
+    return True
+
+
+MAX_UNNAMED = 2      # opponent monsters the reader could not name, played as the stand-in
+
+
+def from_case(case: dict, max_unnamed: int = MAX_UNNAMED) -> dict | None:
+    """A logged battle (sim.from_logs.battles_from_log) -> the opponent's team as a pool entry, or
+    None when it cannot be used.
+
+    The numbers are the badges read at the start of the battle. A monster the reader could not
+    name plays as the stand-in with its own badges and no passive (so the team is a little weaker
+    than the real one); a team with more than `max_unnamed` of them is left out. The opponent's
+    trainer and trinkets are not visible: none are given, and what trinkets add to badges is
+    already in the numbers."""
+    from sim.battle import simulate
+    day = case.get("day")
+    slots, unnamed = [], 0
+    for s in (case.get("b") or {}).get("slots") or []:
+        if s and not s.get("name"):
+            if not any(s.get("stats", {}).values()):
+                s = None                              # nothing readable in the slot
+            else:
+                s = {**s, "name": data.STAND_IN}
+                unnamed += 1
+        slots.append(dict(s) if s else None)
+    if not isinstance(day, int) or not any(slots) or unnamed > max_unnamed:
+        return None
+    spec = {"trainer": "", "day": day, "hp": data.hp_for_day(day), "skill": "recorded", "trinkets": [],
+            "slots": slots, "unnamed": unnamed, "source": case.get("source")}
+    try:
+        simulate(spec, spec, until=0.5)               # a name the simulator does not know raises
+    except Exception:
+        return None
+    return spec
+
+
+def record_from_logs(paths: list[Path] | None = None) -> tuple[int, int]:
+    """Add every usable opponent team in the run logs to data/opponents_recorded.jsonl.
+    Returns (teams added, battles looked at)."""
+    from sim import from_logs
+    paths = paths or sorted(from_logs.LOG_DIR.glob("run_*.jsonl"))
+    added = seen = 0
+    for p in paths:
+        for case in from_logs.battles_from_log(p):
+            seen += 1
+            spec = from_case(case)
+            if spec is not None and add_recorded(spec["day"], spec):
+                added += 1
+    return added, seen
 
 
 _CACHE: dict[tuple, dict] = {}
 
 
-def pools(n: int = 48, seed: int = 1) -> dict[int, list[dict]]:
-    key = (n, seed)
+def pools(n: int = 48, seed: int = 1, recorded: bool = True) -> dict[int, list[dict]]:
+    """Ghost teams per day, with the recorded real teams mixed in (recorded=False: ghosts only)."""
+    key = (n, seed, recorded)
     if key not in _CACHE:
-        _CACHE[key] = build_pools(n=n, seed=seed)
+        _CACHE[key] = build_pools(n=n, seed=seed, recorded=recorded)
     return _CACHE[key]
+
+
+def main() -> int:
+    """python -m engine.opponents : add the opponents in logs/run_*.jsonl to the recorded file."""
+    added, seen = record_from_logs()
+    rec = load_recorded()
+    print(f"{seen} logged battles, {added} new opponent teams added; "
+          f"{sum(len(v) for v in rec.values())} recorded in {RECORDED.name}")
+    print("per day:", ", ".join(f"{d}: {len(v)}" for d, v in sorted(rec.items())))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -36,7 +36,7 @@ HOF = 3                      # generations of league snapshots kept
 
 
 def _source(league: dict, ghost_n: int, p_ghost: float, p_league: float, p_recorded: float) -> OppSource:
-    return OppSource(ghosts=opponents.pools(n=ghost_n, seed=TRAIN_POOL_SEED), league=league,
+    return OppSource(ghosts=opponents.pools(n=ghost_n, seed=TRAIN_POOL_SEED, recorded=False), league=league,
                      recorded=opponents.load_recorded(), p_ghost=p_ghost, p_league=p_league,
                      p_recorded=p_recorded)
 

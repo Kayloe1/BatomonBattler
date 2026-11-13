@@ -154,3 +154,38 @@ class StatsNames(unittest.TestCase):
         self.assertEqual(case["b"]["slots"][0]["name"], "Spinarai")     # a battle name is kept
         self.assertEqual(case["b"]["slots"][1]["name"], "Puffloon")
         self.assertEqual(case["problems"], [])
+
+
+class BattleBadges(unittest.TestCase):
+    """Badges whose digits fill a narrow tile (found 2026-11-13 in the late battles)."""
+
+    def badges(self, name, slot):
+        if not (ROOT / "captures" / name).exists():
+            self.skipTest(f"captures/{name} not here")
+        got = reader.read_stat_badges(pic(name), reader.owned_badge_band(reader.battle_slot(1, slot)))
+        return [(b["value"], b["stat"]) for b in got]
+
+    def test_a_shield_between_two_badges_is_not_read_as_damage(self):
+        self.assertEqual(self.badges("battles/20261112_134119_start.png", 0),
+                         [(52, "damage"), (1128, "shield"), (40, "burn")])
+
+    def test_three_digits_filling_the_tile_are_all_read(self):
+        self.assertEqual(self.badges("battles/20261112_134015_start.png", 5), [(550, "shield"), (22, "burn")])
+
+    def test_leading_digits_of_a_four_digit_number_are_kept(self):
+        self.assertEqual(self.badges("battles/20261112_144657_start.png", 2), [(2937, "damage"), (9, "poison")])
+
+
+class WonRunLabel(unittest.TestCase):
+    def test_the_last_battle_of_a_won_run_is_a_win(self):
+        def log(badges, lives):
+            recs = [{"kind": "shop", "state": {"badges": badges, "badges_goal": 10, "lives": lives, "day": 11}},
+                    {"kind": "battle", "day": 11, "seen": {"my_team": [], "opponent_team": []}},
+                    {"kind": "run_over"}]
+            with tempfile.TemporaryDirectory() as d:
+                path = Path(d) / "run_x.jsonl"
+                path.write_text(chr(10).join(json.dumps(r) for r in recs), encoding="utf-8")
+                return from_logs.battles_from_log(path)[0]["result"]
+        self.assertEqual(log(9, 7), "win")
+        self.assertEqual(log(4, 1), "loss")
+        self.assertIsNone(log(9, 1))            # one badge short on the last life: either

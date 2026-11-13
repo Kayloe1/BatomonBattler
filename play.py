@@ -3,6 +3,7 @@
     python play.py            # play until the run ends or something is unclear
     python play.py --days 1   # stop after one battle
     python play.py --simple   # the old simple rules instead of the decision engine
+    python gui.py             # the same, from a small window with Start, Pause and Stop
 
 Decisions (engine/, see docs/decision-engine.md):
 - shop: the engine picks one action at a time (use an item, buy, sell, reroll),
@@ -96,6 +97,20 @@ def learn_sprites(h, state: dict) -> None:
         print("card sprites not saved:", e)
 
 
+def remember_opponent(log_path) -> None:
+    """Add the opponent of the battle just logged to data/opponents_recorded.jsonl, so the engine
+    scores later decisions against real teams too (it joins the pool the next time play.py starts)."""
+    try:
+        from engine import opponents
+        from sim import from_logs
+        cases = from_logs.battles_from_log(log_path)
+        spec = opponents.from_case(cases[-1]) if cases else None
+        if spec is not None and opponents.add_recorded(spec["day"], spec):
+            print(f"  opponent of day {spec['day']} recorded ({spec['unnamed']} unnamed)")
+    except Exception as e:      # never stop a run over this
+        print("opponent not recorded:", type(e).__name__, e)
+
+
 def act(h, a):
     """Carry out one engine action with the hands."""
     if a.kind == "buy":
@@ -113,7 +128,34 @@ def act(h, a):
     raise ValueError(f"unknown action {a}")
 
 
+# Every screen the loop in main() acts on. A fade, matchmaking or a battle can end on any of them
+# (a fade after an event leads to a gift box, after the last battle to the run-over screen), so
+# the wait at the top of the loop accepts them all.
+AFTER_WAIT = {"shop", "result", "event", "gift_box", "trinket_pick", "trainer_pick", "select_target",
+              "overflow", "cash_in", "run_over", "new_run", "main_menu", "main_menu_continue",
+              "continue_confirm", "title"}
+
 LAST_LOG = None          # path of the log of the latest main() call (batch.py reads it)
+
+
+class Control:
+    """Who follows a session from outside, and may hold or end it between two actions.
+
+    This one is the terminal: it shows nothing extra and never holds the loop. The control window
+    (gui.py) passes its own, which fills its panes from the events and has the buttons.
+    Events: "start" (log, thinking: file names), "state" (state: each fresh read of the screen),
+    "doing" (what: "thinking" or "battle"), "plan" (win_now), "think" (lines), "log" (record, data:
+    every record written to the run log) and "needs_you" (why, capture, log: the bot has stopped).
+    """
+    stop_asked = False          # True once the session should end after the current action
+
+    def event(self, kind: str, **data) -> None:
+        pass
+
+    def pause_point(self) -> bool:
+        """Called between two actions, never inside one. Waits here while paused. True when the
+        loop must start over: a pause has passed (the screen is read again) or a stop was asked."""
+        return False
 
 
 def alert(why: str, log_path) -> None:
@@ -135,7 +177,9 @@ def alert(why: str, log_path) -> None:
         pass
 
 
-def main(argv=None) -> int:
+def main(argv=None, control: Control | None = None, hands=None, brain=None) -> int:
+    """Play one session. From the terminal only argv is used. gui.py passes a Control (events,
+    pause, stop); the tests also pass their own hands and brain so that no game is needed."""
     global LAST_LOG
     ap = argparse.ArgumentParser()
     ap.add_argument("--days", type=int, default=99, help="stop after this many battles")
@@ -146,11 +190,12 @@ def main(argv=None) -> int:
                     help="if no run is open, start a CASUAL Pantra run (never Ranked) and pick a trainer")
     args = ap.parse_args(argv)
 
-    h = hands_mod.Hands(dry_run=False)
-    brain = None
-    if not args.simple:
+    control = control or Control()
+    h = hands or hands_mod.Hands(dry_run=False)
+    if brain is None and not args.simple:
         if Brain is None:
             print("decision engine unavailable:", _ENGINE_ERROR)
+            control.event("needs_you", why=f"decision engine unavailable: {_ENGINE_ERROR}", capture=None, log=None)
             return 1
         brain = Brain(learned=args.learned)
     log_path = hands_mod.LOG_DIR / f"run_{datetime.now():%Y%m%d_%H%M%S}.jsonl"
@@ -159,12 +204,15 @@ def main(argv=None) -> int:
     def log(kind: str, **data) -> None:
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(json.dumps({"time": datetime.now().isoformat(timespec="seconds"), "kind": kind, **data}) + "\n")
+        control.event("log", record=kind, data=data)
 
     think_path = log_path.with_name(log_path.name.replace("run_", "thinking_").replace(".jsonl", ".txt"))
+    control.event("start", log=log_path.name, thinking=think_path.name)
 
     def think(lines: list[str]) -> None:
         """Say what the bot is thinking: on screen and in logs\\thinking_<time>.txt."""
         print("\n".join(lines))
+        control.event("think", lines=lines)
         try:
             with open(think_path, "a", encoding="utf-8") as f:
                 f.write("\n".join(lines) + "\n\n")
@@ -179,6 +227,7 @@ def main(argv=None) -> int:
     def stop(why: str, state: dict | None = None) -> int:
         print("STOPPED:", why)
         log("stop", why=why, state=state)
+        control.event("needs_you", why=why, capture=(state or {}).get("saved_capture"), log=log_path.name)
         alert(why, log_path)
         return 1
 
@@ -190,11 +239,18 @@ def main(argv=None) -> int:
     tried_unknown: set = set()  # unnamed monsters already hovered (learn_monsters)
     seen_notes: list[str] = []
     while True:
+        control.pause_point()               # a pause is held here; the screen is read again after it
+        if control.stop_asked:
+            print("stopped from the control window")
+            log("stop", why="stopped from the control window")
+            return 0
         state = h.look()
         screen = state["screen"]
+        control.event("state", state=state)
         if screen in ("blank", "matchmaking", "battle"):
-            state = h.wait_for({"shop", "result", "event"}, 300)
+            state = h.wait_for(AFTER_WAIT, 300)
             screen = state["screen"]
+            control.event("state", state=state)
         if state["problems"]:
             return stop("; ".join(state["problems"]) + f" (capture: {state.get('saved_capture')})", state)
         if state.get("notes") and state["notes"] != seen_notes:
@@ -238,8 +294,12 @@ def main(argv=None) -> int:
             else:
                 brain.observe_shop(state)
                 last_shop_state = state
+                control.event("doing", what="thinking")
                 plan = brain.shop_plan(state)
+                if control.pause_point():
+                    continue                    # paused or stopped while thinking: nothing is clicked
                 a = plan.actions[0]
+                control.event("plan", win_now=plan.win_now)
                 think(explain(plan, state))
                 log("plan", actions=[str(x) for x in plan.actions], why=[x.why for x in plan.actions],
                     notes=plan.notes, value=plan.value)
@@ -247,12 +307,23 @@ def main(argv=None) -> int:
                     r = act(h, a)
                     print(f"day {state['day']}: {a.why} -> {r.message}")
                     log(a.kind, action=str(a), why=a.why, ok=r.ok, message=r.message)
+                    if not r.ok and a.kind == "item" and r.message == hands_mod.ITEM_STILL_THERE:
+                        # the click did nothing we can see: today's item uses are spent (the item
+                        # counter is not read). Not a reason to stop; plan again without items.
+                        brain.note_action("items_done", state)
+                        think([f"The game did not take {state['shop'][a.index]['name']}: "
+                               f"I use no more items today."])
+                        continue
                     if not r.ok:
                         return stop(f"{a} failed: {r.message} (capture: {(r.after or {}).get('saved_capture')})", r.after)
                     brain.note_action(a.kind, state, a.index)
                     continue
                 # end of the turn: lock, moves, then battle
+                held = False
                 for b in plan.actions[:-1]:
+                    held = control.pause_point()
+                    if held:
+                        break
                     r = act(h, b)
                     print(f"day {state['day']}: {b} ({b.why}) -> {r.message}")
                     log(b.kind, action=str(b), why=b.why, ok=r.ok, message=r.message)
@@ -260,12 +331,17 @@ def main(argv=None) -> int:
                         # a failed move leaves a worse layout, not a broken run: stop moving
                         print("  layout step failed; battling with the layout as it is")
                         break
+                if held:
+                    continue                    # paused or stopped between two moves: read and plan again
                 print(f"day {state['day']}: {plan.notes[-1] if plan.notes else ''}")
             if battles >= args.days:
                 print("day limit reached; stopping before BATTLE!")
                 log("stop", why="day limit")
                 return 0
+            if control.pause_point():
+                continue                        # paused or stopped just before BATTLE!
             last_shop = state
+            control.event("doing", what="battle")
             r = h.battle()
             battles += 1
             print(f"day {state['day']}: battle -> {r.message}")
@@ -279,6 +355,7 @@ def main(argv=None) -> int:
                 log("battle_stats", day=state["day"], **r.battle["stats"])
                 for p_ in st["problems"]:
                     print("  stats:", p_)
+                remember_opponent(log_path)
                 if st["stuck"]:
                     return stop("the Stats window did not close", None)
             if not r.ok:

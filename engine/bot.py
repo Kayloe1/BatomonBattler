@@ -58,8 +58,10 @@ class Brain:
         again today, and rerolls are counted so a spending spree has an end."""
         day = state.get("day")
         if self.memory.get("turn_day") != day:
-            self.memory.update(turn_day=day, bought=[], rerolls=0)
-        if kind == "buy" and index is not None:
+            self.memory.update(turn_day=day, bought=[], rerolls=0, items_done=False)
+        if kind == "items_done":         # the game refused an item: no item uses are left today
+            self.memory["items_done"] = True
+        elif kind == "buy" and index is not None:
             card = (state.get("shop") or [None] * 5)[index]
             if card and card.get("kind") == "monster" and card.get("name"):
                 self.memory["bought"].append(card["name"])

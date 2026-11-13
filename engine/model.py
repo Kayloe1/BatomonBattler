@@ -516,18 +516,26 @@ def reroll(s: RunState, rng: random.Random) -> RunState:
     else:
         t.money -= t.reroll_price
     t.rerolls += 1
-    t.shop = random_shop(t.rank, rng, t.trainer, t.odds)
+    t.shop = random_shop(t.rank, rng, t.trainer, t.odds, day=t.day)
     return t
 
 
+GENTLEMAN_FROM_DAY = 4      # "From day 4 onwards, your shop no longer stocks Common or Uncommon monsters"
+
+
 def random_shop(rank: int, rng: random.Random, trainer: str | None = None,
-                odds: tuple[int, ...] | None = None) -> list[Card | None]:
+                odds: tuple[int, ...] | None = None, day: int | None = None) -> list[Card | None]:
+    """Five cards by the rank odds. `odds` read from the screen are used as they are; when none are
+    given, the table for `rank` is used and Gentleman's rule is applied to the monster cards
+    (`day` defaults to the rank, which is the day unless Apex Bait raised it)."""
+    table = odds is None
     odds = odds or data.rank_odds(rank)
-    if trainer == "Gentleman" and odds is None:
-        odds = (0, 0) + tuple(odds[2:]) if sum(odds[2:]) else (0, 0, 100, 0, 0)
+    monster_odds = odds
+    if trainer == "Gentleman" and table and (day if day is not None else rank) >= GENTLEMAN_FROM_DAY:
+        monster_odds = (0, 0) + tuple(odds[2:]) if sum(odds[2:]) else (0, 0, 100, 0, 0)
     cards: list[Card | None] = []
     for _ in range(data.SHOP_MONSTERS):
-        rarity = rng.choices(data.RARITIES, weights=odds)[0]
+        rarity = rng.choices(data.RARITIES, weights=monster_odds)[0]
         sp = rng.choice(data.by_rarity(rarity))
         cards.append(Card(sp.name, sp.cost, "monster", tuple(sorted(sp.stats(1).items())), rarity))
     cards.append(_random_item(rank, rng, odds))
@@ -600,7 +608,9 @@ def from_reader(state: dict, memory: dict | None = None) -> RunState:
         trainer=state.get("trainer"), trinkets=list(memory.get("trinkets", [])),
         shop=[card_from_reader(c) for c in state.get("shop") or [None] * 5],
         team=team, bench=bench, locked=bool(state.get("locked")),
-        rescue_used=bool(memory.get("rescue_used")), items_left=1,
+        rescue_used=bool(memory.get("rescue_used")),
+        # the item counter is not read: assume a use is left until the game refuses an item today
+        items_left=0 if same_turn and memory.get("items_done") else 1,
         hp_today=state.get("trainer_hp"),
         odds=tuple(state["shop_odds"].get(r, 0) for r in data.RARITIES) if state.get("shop_odds") else None,
         reroll_price=state.get("reroll_price") or data.REROLL_PRICE,
