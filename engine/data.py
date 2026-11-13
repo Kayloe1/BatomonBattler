@@ -81,6 +81,7 @@ class Species:
     evolves: bool = False
     no_ability: bool = False                                   # Stellagon / Focus Pill condition
     foreign: bool = False                                      # data/foreign_monsters.csv (another region)
+    event_only: bool = False                                   # given only by an event (Ignit, Talonite...)
 
     @property
     def is_bug(self) -> bool:
@@ -166,6 +167,7 @@ def roster() -> dict[str, Species]:
             evolves="Evolves at level 3" in passive,
             no_ability=not passive,
             foreign=is_foreign,
+            event_only="Event-only" in (row.get("source") or ""),
         )
     return out
 

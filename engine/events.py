@@ -216,6 +216,22 @@ def score_effect(planner: Planner, s: RunState, effect: str) -> tuple[float, str
                 t = _with_unit(s, model.new_unit(sp.name, sp.cost, level))
                 gains.append(_team_gain(planner, s, t) if t else 0.0)
             return sum(gains) / len(gains), f"average of {len(gains)} sample level {level} {rarity} monsters added to the team", False
+    m = re.search(r"foreign (Common|Uncommon|Rare|Super Rare|Legendary) monster", effect)
+    if m:
+        # "Gain a foreign Rare monster. It can now appear in your shop.": a random monster of another
+        # region; scored as the average of the ones already learned (data/foreign_monsters.csv)
+        rarity = m.group(1)
+        pool = sorted((sp for sp in data.roster().values()
+                       if sp.foreign and not sp.event_only and sp.rarity == rarity and sp.name != data.STAND_IN),
+                      key=lambda sp: sp.name)
+        if pool:
+            gains = []
+            for sp in pool[:RANDOM_SAMPLES]:
+                t = _with_unit(s, model.new_unit(sp.name, sp.cost, 1))
+                gains.append(_team_gain(planner, s, t) if t else 0.0)
+            names = ", ".join(sp.name for sp in pool[:RANDOM_SAMPLES])
+            return (sum(gains) / len(gains),
+                    f"average of the foreign {rarity} monsters I know ({names}) added to the team", False)
     m = re.match(r"Gain (.+)$", effect)
     if m:
         name = m.group(1).strip()
