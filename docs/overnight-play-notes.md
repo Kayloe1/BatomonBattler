@@ -103,3 +103,32 @@ _(filled in at the end)_
   Thorntail reached 1038 damage, Fumungus 2561.
 - Item note: **Ultra Candy (Mythical, $60) levels a random level 3 monster**; with only one Lv3 it is a
   guaranteed Lv4 (Fumungus Lv4: CD 1.5 s, Poison 12, 1200%).
+- Day 11 (HP 24900, $138): **Warhorn stacks every battle** (team monsters showed +20 Damage by Day 11).
+  Added Aristobat (Toxic, Poison 4 x2) and a Legendary **Gaiadrasil** (Damage = 100% of adjacent allies'
+  Damage; next to Thorntail its card showed 1038 in the shop). **Lost** to a Burn engine: **Lignite Lv2
+  (Damage = 48x its Burn) with Burn 144 hit for 6982** (8562 total) fed by Magmalith Lv3, plus Sunsage Lv3
+  (21 casts), Cinderfly, Dracana and a Shiny Dribblet Lv3 healer (2568 healed). 763 Burn on us.
+- **Last-life rescue** ("A mysterious trainer approaches..."): three "Accept a life and ..." options:
+  Super Rare trinket gift / random level 2 Super Rare monster / **Mysterious Charm = "[Unique] +25% HP"**.
+  The engine picked the monster (+0.81) and valued the Charm at a +0.05 guess. Took the Charm: HP went
+  34700 -> 43375 (x1.25). **So the +25% HP the engine applies after every rescue (`planner._hp`) comes from
+  this Charm, not from the rescue itself** (the old simple rules always took the last option, the Charm).
+  The opponent's HP stays on the table (34700).
+- Day 12 (1 life): **Saberhorn** (Legendary, gives the ally in front +1 Multicast) behind Thorntail (sim 59% ->
+  67%). **Golden Gift ($50) gives one Legendary trinket with no choice**: Metronome (casts give +10 Damage
+  for the battle). Won Day 12 (7 badges).
+- Day 13 (HP 59125): **Blue Ticket** turned the shop Rare and offered a "LV 2" Noxalith (merged; gift: Link
+  Cable / Arcade Coins (10 free rerolls) / Fool's Gold). **Link Cable makes Gaiadrasil add up the whole
+  team**: its card showed 2472 = every ally's Damage + its own; two Gaiadrasils each showed ~2440 (each
+  leaves out the other). The sim did not change its win chance for any of this (it probably does not model
+  Link Cable on Gaiadrasil).
+- **Day 13 lost, run over (7 badges)**: Blazewing Lv3 (Burn 195, Multicast 7) put 5113 Burn on us; dead in
+  ~14 s. Each Gaiadrasil (9 s cooldown, 8.2 s with Haste Orb) cast once.
+
+### What Run 1 says about strategy
+- Late game (Day 11+) is decided by **Burn burst**: Lignite/Magmalith or Blazewing teams kill in ~15 s. Slow
+  carries (9 s Gaiadrasil, poison that needs time) lose to them. Poison scaling won Days 5-10 and 12.
+- **Permanent growers carried the run**: Fumungus (Poison 6 -> 90 via Noxalith), Thorntail (50 -> 2442),
+  Warhorn. The bot should value permanent growth that compounds across days much more than the one-battle sim does.
+- Several of the engine's choices were wrong because it could not see things: Shiny Stingarde (sell it),
+  Fumungus (unnamed), Ignit, Mysterious Charm, Link Cable + Gaiadrasil.
