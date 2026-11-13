@@ -57,6 +57,12 @@ below; see the end of the log.
 3. The engine's "feed and sell" Bug move scored above keeping a strong Bug (Stingarde) on Day 2.
 4. Opponent Shiny monsters in battle are not read as Shiny (battle matching uses plain sprites only).
 5. The Stats window does not find yellow "Inflicted N Shock" lines as text bands.
+6. **OVERFLOW screen (stops the bot).** An event monster that arrives with team and bench full sits in an
+   "OVERFLOW" slot right of the team ("YOUR TEAM IS FULL. DRAG HERE TO SELL A MONSTER."); the team grid
+   shifts left, the bench does not. Selling any bench monster (drag onto the message box) moves the overflow
+   monster into the freed slot and the shop returns. Capture: `captures/stuck_20261112_211945.png`; probe
+   colours: OVERFLOW header (255,189,8) at (1700,655), grey buttons (90,90,99) at (100,1215) and (2300,1215).
+   Bot Run 3 (Chemist) stopped here on Day 9 with 4 badges and 1 life; the sale was done by hand.
 
 Done later in the night: Purple Egg named on team/bench (kept out of battle matching), Mirror / Glimmer /
 Legendary Potions modelled, and `Params.grow_next` (tomorrow is scored with one battle's permanent growth).

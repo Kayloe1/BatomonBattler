@@ -62,8 +62,9 @@ class Params:
     screen: int = 2            # cards tried per greedy step (best by a quick estimate)
     final_rounds: int = 3
     margin_weight: float = 0.3   # how much "closer battles" count next to battles won
-    grow_next: bool = True       # score tomorrow with the permanent growth one battle gives (Thorntail,
-                                 # Noxalith->Fumungus...): those growers carried both hand-played runs
+    grow_next: bool = False      # score tomorrow with the permanent growth one battle gives (Thorntail,
+                                 # Noxalith->Fumungus...). Off: 8 offline runs each, seeds 2000+, gave
+                                 # 25% won / 5.88 badges with it and 37.5% / 6.12 without (2026-11-12)
 
 
 @dataclass
