@@ -131,9 +131,9 @@ SCREENS: dict[str, list[tuple[int, int, tuple[int, int, int]]]] = {
     # Confirm (grey until a monster is clicked) and Back below them.
     "select_target": [(1500, 410, (255, 189, 8)), (1500, 760, PINK), (1350, 1330, RED), (1700, 1330, RED),
                       (400, 210, (255, 189, 8))],
-    # Title screen: the logo, the dragon silhouette and the dark "PRESS ANY KEY TO START" label
-    "title": [(768, 240, (237, 103, 250)), (1408, 240, (67, 249, 245)), (1280, 739, (111, 49, 71)),
-              (890, 1045, (55, 55, 55)), (1650, 1045, (55, 55, 55))],
+    # Title screen: the logo and the dragon silhouette (the dark "PRESS ANY KEY TO START" label is not
+    # always shown: it was missing on a fresh start, 2026-11-13, and the bot stopped there)
+    "title": [(768, 240, (237, 103, 250)), (1408, 240, (67, 249, 245)), (1280, 739, (111, 49, 71))],
     # "Cash In": a trinket dialog (blue header, white body) with one red button, shop dimmed behind it
     "cash_in": [(1280, 255, (0, 132, 189)), (1280, 560, (255, 255, 255)), (1152, 1020, RED),
                 (1408, 1046, RED), (25, 1315, (22, 22, 23))],
