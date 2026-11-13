@@ -85,6 +85,24 @@ below; see the end of the log.
 - Still the main reason logged battles cannot be checked against the simulator: unnamed opponents
   (52 of 56 logged battles skipped; 24 of them are from before the battle screen was read at all).
 
+### Casual run on 2026-11-13 morning (Bug Catcher: 8 badges, out on day 13)
+Stops fixed on the way, each with a test:
+- Card font had no 7 (a Coupon took Mosslug to $7).
+- A monster bought for $0 (Bug Catcher's first Bug of the day) sells for $0: the sell check now accepts
+  unchanged money when one monster really left.
+- **Stats scroll now works.** Whole wheel notches reach the game; the scrolled picture was then thrown away
+  because the screen check looked at the first yellow header (scrolls away) and the scrollbar track (the
+  yellow handle arrives). `reader.is_stats_window` uses the title bar and close button. Days 6-13: all
+  12 slots read with no problems.
+- Gift box and trinket pick after an event are drawn over plain black, not the dimmed shop: both are now
+  recognised by their own pictures.
+- **Opponents are named from the Stats window.** Its pictures are the shop card pictures, pixel for pixel
+  (known monsters score 0, runner-up 70+). `read_stats` returns `my_names` / `opponent_names`;
+  `sim.from_logs` fills unnamed battle slots from them (older logs: read from the saved Stats pictures,
+  cached in logs/stats_names_cache.json). Slot numbers agree with the battle screen: 304 of 304.
+  Logged battles the simulator can check went from 4 to 12 (agrees on 11). Older logs still miss the
+  opponent's back row (no scrolled picture); new runs will not.
+
 Done later in the night: Purple Egg named on team/bench (kept out of battle matching), Mirror / Glimmer /
 Legendary Potions modelled, and `Params.grow_next` (tomorrow is scored with one battle's permanent growth).
 

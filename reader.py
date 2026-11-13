@@ -1115,6 +1115,29 @@ def _stats_lines(rgb: np.ndarray, problems: list[str], where: str) -> dict:
     return out
 
 
+def match_stats_sprite(rgb: np.ndarray) -> tuple[str | None, float]:
+    """Name the monster on a Stats window card. The picture there is the shop card's picture,
+    pixel for pixel, still and facing the same way (seen 2026-11-13: known monsters score 0,
+    the runner-up 70 or more), so this is far surer than reading the battle field."""
+    region = rgb.astype(np.float32)
+    by_name: dict[str, float] = {}
+    for name, t, k in _battle_templates():
+        if t.shape[0] > region.shape[0] or t.shape[1] > region.shape[1]:
+            continue
+        m3 = np.repeat(k[..., None], 3, axis=2).astype(np.float32)
+        res = cv2.matchTemplate(region, np.ascontiguousarray(t, dtype=np.float32), cv2.TM_SQDIFF, mask=m3)
+        d = float(np.sqrt(max(res.min(), 0.0) / m3.sum()))
+        by_name[name] = min(d, by_name.get(name, 1e9))
+    if not by_name:
+        return None, 1e9
+    ranked = sorted(by_name.items(), key=lambda kv: kv[1])
+    best, best_d = ranked[0]
+    second = ranked[1][1] if len(ranked) > 1 else 1e9
+    if not _battle_match_ok(best_d, second):
+        return None, best_d
+    return best, best_d
+
+
 def read_stats_window(pic: np.ndarray) -> dict:
     """Every card visible in the Stats window: {"cells": [{"section", "row", "col", "present",
     "lines"}], "headers": n, "problems": [...]}.
@@ -1144,8 +1167,10 @@ def read_stats_window(pic: np.ndarray) -> dict:
                 present = bool((sprite.min(axis=2) < 215).mean() > 0.02)
                 where = f"stats header {h} row {row} col {col}"
                 lines = _stats_lines(card[:, STATS_SPRITE_W:], problems, where)
+                name, dist = match_stats_sprite(card[:, :STATS_SPRITE_W + 30]) if present else (None, None)
                 cells.append({"header": h, "headers": len(heads), "row": row, "col": col,
-                              "slot": row * 3 + col, "present": present or bool(lines), "lines": lines})
+                              "slot": row * 3 + col, "present": present or bool(lines), "lines": lines,
+                              "name": name, "sprite_distance": None if dist is None else round(dist, 1)})
     return {"cells": cells, "headers": len(heads), "problems": problems}
 
 
@@ -1160,9 +1185,12 @@ def read_stats(top_pic: np.ndarray, scrolled_pic: np.ndarray | None) -> dict:
     problems = list(a["problems"])
     my: list = [None] * 6
     opp: list = [None] * 6
+    my_names: list = [None] * 6
+    opp_names: list = [None] * 6
     for c in a["cells"]:
         if c["header"] == 0 and c["headers"] >= 1:
             my[c["slot"]] = c["lines"] if c["present"] else None
+            my_names[c["slot"]] = c.get("name")
     sources = [read_stats_window(scrolled_pic)] if scrolled_pic is not None else []
     sources.append(a)
     got = set()
@@ -1172,12 +1200,14 @@ def read_stats(top_pic: np.ndarray, scrolled_pic: np.ndarray | None) -> dict:
             last = c["header"] == c["headers"] - 1 and (c["headers"] >= 2 or src is not a)
             if last and c["slot"] not in got:
                 opp[c["slot"]] = c["lines"] if c["present"] else None
+                opp_names[c["slot"]] = c.get("name")
                 got.add(c["slot"])
         if len(got) == 6:
             break
     if len(got) < 6:
         problems.append(f"stats: opponent slots seen {sorted(got)} of 0-5 (scroll may have failed)")
-    return {"my_team": my, "opponent_team": opp, "problems": problems}
+    return {"my_team": my, "opponent_team": opp, "my_names": my_names, "opponent_names": opp_names,
+            "problems": problems}
 
 
 # End of battle: the HP bars on the (dimmed) result screen. The bar fills from the left.

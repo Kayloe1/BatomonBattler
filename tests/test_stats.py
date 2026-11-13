@@ -133,3 +133,24 @@ class ScrolledStats(unittest.TestCase):
         self.assertEqual(r["problems"], [])
         self.assertEqual(r["opponent_team"][3], {"inflicted": {"Poison": 6}, "triggered": 6})
         self.assertEqual(r["opponent_team"][4], {"healed": 140, "inflicted": {"Poison": 161}, "triggered": 14})
+
+
+class StatsNames(unittest.TestCase):
+    def test_both_teams_are_named_from_the_stats_cards(self):
+        top, bottom = "battles/20261113_085236_stats_top.png", "battles/20261113_085236_stats_bottom.png"
+        if not (ROOT / "captures" / bottom).exists():
+            self.skipTest("captures not here")
+        r = reader.read_stats(pic(top), pic(bottom))
+        self.assertEqual(r["my_names"], ["Ironcore", "Bumblebolt", "Runerock", "Frizzly", "Venopuff", "Velocect"])
+        self.assertEqual(r["opponent_names"], ["Spinarai", "Puffloon", "Shogapede", "Noxnimbus", "Puffloon", "Venopuff"])
+
+    def test_unnamed_battle_slots_take_the_stats_names(self):
+        case = {"a": {"slots": [from_logs._slot({"name": None, "level": 1, "stats": []}), None]},
+                "b": {"slots": [from_logs._slot({"name": "Spinarai", "level": 1, "stats": []}),
+                                from_logs._slot({"name": None, "level": 2, "stats": []})]},
+                "problems": ["my slot 1 not named", "opponent slot 2 not named"]}
+        from_logs._name_from_stats(case, ["Ironcore", None], ["Puffloon", "Puffloon"])
+        self.assertEqual(case["a"]["slots"][0]["name"], "Ironcore")
+        self.assertEqual(case["b"]["slots"][0]["name"], "Spinarai")     # a battle name is kept
+        self.assertEqual(case["b"]["slots"][1]["name"], "Puffloon")
+        self.assertEqual(case["problems"], [])
