@@ -312,6 +312,9 @@ FRAME_RARITY: dict[str, tuple[int, int, int]] = {
     "Legendary": (212, 124, 0),
 }
 STAT_HUE_TOL = 22           # degrees of hue (+ saturation penalty)
+# The shaded part of a tile, where it is all that shows above the digits of a narrow, full tile
+# (a Shield tile holding "1128": the light colour is hidden, 2026-11-13).
+STAT_SHADES: list[tuple[str, tuple[int, int, int]]] = [("shield", (152, 160, 216))]
 
 RARITIES = ["Common", "Uncommon", "Rare", "Super Rare", "Legendary"]
 
@@ -697,11 +700,36 @@ def _saturation(colour: tuple[int, int, int]) -> float:
 def stat_name(colour: tuple[int, int, int]) -> str | None:
     """Which stat a badge tile colour stands for (hue and saturation both count)."""
     best, best_d = None, STAT_HUE_TOL
-    for name, ref in STAT_COLORS.items():
+    for name, ref in list(STAT_COLORS.items()) + STAT_SHADES:
         d = _hue_gap(_hue(colour), _hue(ref)) + 60 * abs(_saturation(colour) - _saturation(ref))
         if d < best_d:
             best, best_d = name, d
     return best
+
+
+def _badge_colour(beside: list[np.ndarray], above: list[np.ndarray]) -> tuple[tuple | None, str | None]:
+    """(tile colour, stat) of one badge, from the tile pixels above and beside its digits.
+
+    The strip of tile above the digits decides when it shows a known colour: it lies inside the
+    badge's own columns. The pixels beside a digit can belong to the neighbouring tile when the
+    digits fill a narrow tile ("52" then "1128" read the shield as damage; "1522" beside a Poison
+    badge read as Poison), or be missing altogether ("550": the digits were dropped, as were the
+    leading digits of "2937"; 2026-11-13). Otherwise each digit votes with the colour beside it and
+    the first digit wins a tie (a tile is lighter on its left side)."""
+    median = lambda px: tuple(int(v) for v in np.median(px, axis=0))
+    votes = [(stat_name(median(px)), median(px)) for px in beside if len(px)]
+    known = [v for v in votes if v[0]]
+    top = np.concatenate(above) if above else np.empty((0, 3))
+    stat = stat_name(median(top)) if len(top) else None
+    if stat is None and known:
+        count: dict[str, int] = {}
+        for st, _ in known:
+            count[st] = count.get(st, 0) + 1
+        stat = max(count, key=lambda k: count[k])          # max keeps the first on a tie
+    if stat is None:
+        return (votes[0][1] if votes else (median(top) if len(top) else None)), None
+    # report the colour beside a digit when one agrees (the reference colours were taken there)
+    return next((c for st, c in known if st == stat), median(top) if len(top) else None), stat
 
 
 def read_stat_badges(pic: np.ndarray, band: Box) -> list[dict]:
@@ -732,17 +760,21 @@ def read_stat_badges(pic: np.ndarray, band: Box) -> list[dict]:
         for g in glyphs.segment_blobs(digits):
             # tile colour beside the digit (its rows only: the tile's lower edge is shaded)
             near = coloured[g.y0:g.y1, max(g.x0 - 6, 0):g.x1 + 6]
-            px = inner[g.y0:g.y1, max(g.x0 - 6, 0):g.x1 + 6][near]
+            px = inner[g.y0:g.y1, max(g.x0 - 6, 0):g.x1 + 6][near].reshape(-1, 3)
+            # the strip of tile above the digit: used when no digit shows any tile beside it
+            above = inner[max(g.y0 - 8, 0):g.y0, g.x0:g.x1][coloured[max(g.y0 - 8, 0):g.y0, g.x0:g.x1]]
             ch = store().classify("badge", g.bitmap)[0]
-            # digits of one badge sit close together; the tile colour is taken from
-            # the first digit (a tile is lighter on its left side)
+            # digits of one badge sit close together
             if current and g.x0 - current["_x1"] <= 10:
                 current["raw"] += ch
                 current["_x1"] = g.x1
-            elif len(px):
-                colour = tuple(int(v) for v in np.median(px.reshape(-1, 3), axis=0))
-                current = {"raw": ch, "_colour": colour, "_x1": g.x1, "_x": int(band[0] + x + g.x0)}
+            else:
+                current = {"raw": ch, "_px": [], "_above": [], "_x1": g.x1, "_x": int(band[0] + x + g.x0)}
                 found.append(current)
+            current["_px"].append(px)
+            current["_above"].append(above.reshape(-1, 3))
+    for b in found:
+        b["_colour"], b["_stat"] = _badge_colour(b.pop("_px"), b.pop("_above"))
     found.sort(key=lambda b: b["_x"])
     out = []
     for b in found:
@@ -750,8 +782,8 @@ def read_stat_badges(pic: np.ndarray, band: Box) -> list[dict]:
         if raw.startswith("x"):           # "x2": the ability is cast that many times
             out.append({"value": _to_int(raw[1:]), "raw": raw, "stat": "multicast"})
         else:
-            out.append({"value": _to_int(raw), "raw": raw, "stat": stat_name(b["_colour"])})
-        out[-1]["color"] = "#%02x%02x%02x" % b["_colour"]
+            out.append({"value": _to_int(raw), "raw": raw, "stat": b["_stat"]})
+        out[-1]["color"] = "#%02x%02x%02x" % b["_colour"] if b["_colour"] else None
     return out
 
 

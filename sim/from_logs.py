@@ -99,14 +99,50 @@ def _name_from_stats(case: dict, names_a: list, names_b: list) -> None:
                     case["problems"].remove(msg)
 
 
+def _fresh_badges(seen: dict) -> dict:
+    """The logged battle with its stat badges read again from the saved start capture, when it is
+    still there: the log keeps what the reader made of them on the day, and badge reading has
+    been corrected since (2026-11-13: leading digits of four-digit numbers were dropped)."""
+    cap = seen.get("start_capture")
+    if not cap or not (ROOT / cap).exists():
+        return seen
+    try:
+        import numpy as np
+        from PIL import Image
+        sys.path.insert(0, str(ROOT))
+        import reader
+        import window
+        pic = np.asarray(window.canonical_picture(Image.open(ROOT / cap)))
+        out = dict(seen)
+        for side, key in ((0, "my_team"), (1, "opponent_team")):
+            out[key] = [None if s is None else
+                        {**s, "stats": reader.read_stat_badges(pic, reader.owned_badge_band(reader.battle_slot(side, i)))}
+                        for i, s in enumerate(seen.get(key) or [])]
+        return out
+    except Exception:                    # no reader here (the simulator alone needs only Python)
+        return seen
+
+
+def _lives_lost(day) -> int:
+    """Lives a loss costs on this day (the engine's table; 99 = unknown, so a loss stays possible)."""
+    try:
+        from engine import data as engine_data
+        return engine_data.lives_lost(day)
+    except Exception:
+        return 99
+
+
 def battles_from_log(path: Path) -> list[dict]:
     """One case per logged battle: {"a", "b", "day", "result", "problems", "source"}."""
     records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     trinkets: list[str] = []
     cases: list[dict] = []
     open_case: dict | None = None
+    shop: dict = {}                      # the last shop state before the battle
     for rec in records:
         kind = rec.get("kind")
+        if kind == "shop":
+            shop = rec.get("state") or {}
         if kind == "new_run" or kind == "trainer":
             trinkets = []
         elif kind == "trinket" and rec.get("ok"):
@@ -114,7 +150,7 @@ def battles_from_log(path: Path) -> list[dict]:
             if isinstance(k, int) and k < len(offered) and offered[k]:
                 trinkets.append(offered[k])
         elif kind == "battle":
-            seen = rec.get("seen") or {}
+            seen = _fresh_badges(rec.get("seen") or {})
             problems = list(seen.get("problems", []))
             mine = [_slot(s) for s in seen.get("my_team", [])] or [None] * 6
             theirs = [_slot(s) for s in seen.get("opponent_team", [])] or [None] * 6
@@ -154,7 +190,14 @@ def battles_from_log(path: Path) -> list[dict]:
                 open_case["result"] = "draw"     # GUESS: neither a badge nor a life changed hands
             open_case = None
         elif kind == "run_over" and open_case is not None and open_case["result"] is None:
-            open_case["result"] = "loss"         # the run ends on the last lost life
+            # A run ends on the last lost life or on the last badge won; the shop before the
+            # battle says which was possible. When both were (one badge short on the last life),
+            # the result stays unknown.
+            badges, goal, lives = shop.get("badges"), shop.get("badges_goal"), shop.get("lives")
+            could_win = None not in (badges, goal) and badges >= goal - 1
+            could_lose = lives is None or lives <= _lives_lost(open_case["day"])
+            if could_win != could_lose:
+                open_case["result"] = "win" if could_win else "loss"
             open_case = None
     return cases
 
