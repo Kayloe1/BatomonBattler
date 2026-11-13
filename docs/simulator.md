@@ -60,8 +60,16 @@ mine = team_from_reader(reader.read_state(image))   # shop screen -> team
 4. Poison ticks once a second on the battle clock for its stacks and stays. Burn ticks twice a second and
    loses 1 stack per tick. Shock adds its stacks to every damaging hit and stays. Shield absorbs damage
    first; Poison and Burn do 15% less while there is a shield.
-5. At the same instant: casts (player's side, then the opponent's), then Burn and Poison ticks. A trainer
-   at 0 HP loses at once. Both at 0 on the same tick is a draw; 300 s is a draw.
+5. At the same instant: casts (player's side, then the opponent's), then Burn and Poison ticks. Shock
+   inflicted at an instant only adds to hits from the next instant on (`shock_next_instant`). Every cast
+   of both sides at an instant resolves before deaths are checked (`deaths_after_instant`); a trainer at
+   0 HP cannot be healed back. Both at 0 is a draw; 300 s is a draw.
+   *Evidence (2026-11-12, hand-played cases `day2_egg_breeder_loss` and `day3_egg_breeder_win_shiny`):*
+   the Shock rule fits two Bumblebolts casting together (both Dealt 63 over 7 casts) and a Panbud
+   casting with them (Shock 2+6+10) exactly. The deaths rule rests on **one battle**: the opponent's
+   Craghorn still cast (3rd cast, 48 damage, our 40 shield gone) at the 18 s instant at which our casts
+   took them from ~35 HP to 0. "The opponent's side acts first" would also explain it. Our end HP was
+   409 in the game, 402.6 in the sim (410.6 without that last Craghorn hit), a small unexplained gap.
 
 ## What is verified and what is guessed
 
@@ -72,6 +80,8 @@ Two battles are recorded well enough to check (cases in `sim/cases/`, from the R
 |---|---|
 | Day 2 win (both teams visible at battle start, full Stats screen for Ed's side) | **Reproduced exactly**: winner, end time 19 s (the cast counts allow 18-20 s), every trigger count, every Dealt/Healed/Inflicted number on both sides. |
 | Day 3 loss (Ed's team from the log, opponent's team and both HP bars from the end screen) | **Opponent side exact**: 676 damage taken by 14 s (= 800 - 124 on the end screen), Poison 16 and Shock 25 on their bar, Spinarai 5 -> 17 Poison, Noxnimbus 5, Venopuff 8, Mosslug 45. Ed's Poison 101, Mosslug 55, Electranade 1 cast all exact. **Gap:** by 14 s the sim has Ed taking 802 damage and healing 140, so he survives to 16 s and the battle is a draw; the game had him dead by 15 s. The missing ~140 is exactly his heals. |
+
+| Day 1 loss, Day 2 loss, Day 3 win of the hand-played Egg Breeder run (2026-11-12 night) | All exact after the fixes that night: "Triggered" counts casts (not Multicast hits), "Dealt" includes the Shock bonus, the two instant rules above, and a Shiny Stingarde (`"shiny": true`) that keeps casting. |
 
 **Verified by those battles:** first cast after a full cooldown; Poison = stacks once a second on the battle
 clock with no decay; Shock = flat +stacks on every hit with no decay (percent Shock would leave the opponent
