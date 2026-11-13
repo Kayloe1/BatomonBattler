@@ -455,20 +455,41 @@ class Planner:
         return max(0, s.money - reserve)
 
     def _lock_choice(self, s: RunState, team, bench, base: float) -> str | None:
+        """Lock only for a card the bot would really buy tomorrow.
+
+        Locking keeps today's cards and gives up tomorrow's fresh shop. It used to be judged against
+        having $0 left, so nearly every shop with one card a little too dear was locked, and the next
+        morning the bot (comparing that card with everything else) bought it after only 5 of 18 locks
+        (logs up to 2026-11-13). Now tomorrow's first decision is run here: with tomorrow's money and
+        these cards, the best choice must be a card that is too dear today, and it must beat what a
+        fresh shop is expected to offer (a free reroll)."""
         if s.locked:
             return None
         tomorrow = s.money + data.income(s.day + 1)
-        for i, c in enumerate(s.shop):
-            if c is None or c.kind != "monster" or c.price <= s.money or c.price > tomorrow:
-                continue
-            t = replace(s.copy(), money=c.price)
-            if not model.can_buy(t, i):
-                continue
-            v_with, _, _ = self.evaluate_after(t, model.buy(t, i), team, bench)
-            gain = v_with - self.quick(replace(s.copy(), money=0), team, bench)
-            if gain > self.p.lock_gain:
-                return f"lock for {c.name} (${c.price}, worth {gain:+.3f})"
-        return None
+        dear = {c.name: i for i, c in enumerate(s.shop)
+                if c is not None and c.kind == "monster" and c.name and s.money < c.price <= tomorrow}
+        if not dear:
+            return None
+        t = replace(s.copy(), money=tomorrow, rerolls=0)
+        base_t = self.quick(t, team, bench)
+        best_label, best_v = None, base_t
+        for label, actions, states in self._candidates(t):
+            total = 0.0
+            for u in states:
+                v, team2, bench2 = self.evaluate_after(t, u, team, bench)
+                total += self.finish(u, team2, bench2, v)
+            v = total / len(states)
+            if v > best_v:
+                best_label, best_v = label, v
+        target = next((n for n in dear if best_label and (best_label.startswith(f"buy {n} $")
+                                                          or best_label.endswith(f"to buy {n}"))), None)
+        if target is None or best_v - base_t <= self.p.lock_gain:
+            return None
+        fresh = self._reroll_value(replace(t, free_rerolls=t.free_rerolls + 1), team, bench)
+        if fresh is not None and fresh >= best_v:
+            return None
+        c = s.shop[dear[target]]
+        return f"lock for {c.name} (${c.price}): tomorrow's best buy, worth {best_v - base_t:+.3f}"
 
     def final_layout(self, s: RunState):
         return self.arrange_full(s)
