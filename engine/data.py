@@ -81,6 +81,7 @@ class Species:
     evolves: bool = False
     no_ability: bool = False                                   # Stellagon / Focus Pill condition
     foreign: bool = False                                      # data/foreign_monsters.csv (another region)
+    event_only: bool = False                                   # given only by an event (Ignit, Talonite...)
 
     @property
     def is_bug(self) -> bool:
@@ -126,6 +127,8 @@ def roster() -> dict[str, Species]:
     if foreign.exists():
         with open(foreign, encoding="utf-8") as f:
             rows += [(r, True) for r in csv.DictReader(f)]
+    with open(DATA / "stand_in_monsters.csv", encoding="utf-8") as f:     # never in the shop, like foreign
+        rows += [(r, True) for r in csv.DictReader(f)]
     for row, is_foreign in rows:
         name = row["name"]
         cd = float(row["cooldown_s"])
@@ -164,8 +167,14 @@ def roster() -> dict[str, Species]:
             evolves="Evolves at level 3" in passive,
             no_ability=not passive,
             foreign=is_foreign,
+            event_only="Event-only" in (row.get("source") or ""),
         )
     return out
+
+
+# A monster the reader cannot name plays as this (data/stand_in_monsters.csv): its own badges, a typical
+# Rare's speed, no passive. Before, such a monster could neither join the team nor be sold.
+STAND_IN = "Unknown Rare"
 
 
 def species(name: str | None) -> Species | None:

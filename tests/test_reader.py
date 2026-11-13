@@ -107,7 +107,9 @@ class ScreenDetection(unittest.TestCase):
         "trainer_pick.png": "trainer_pick",
         "gift_box.png": "gift_box",
         "gift_box_after_event.png": "gift_box",
+        "title_screen_no_label.png": "title",
         "trinket_pick_after_event.png": "trinket_pick",
+        "trinket_pick_single.png": "trinket_pick",
         "trinket_pick.png": "trinket_pick",
         "shop_day1_broke.png": "shop",          # REROLL button is grey here ($0)
     }
@@ -314,3 +316,14 @@ class CardSeven(unittest.TestCase):
         self.assertEqual(st["problems"], [])
         self.assertEqual([s["price"] for s in st["shop"]], [0, 12, 7, 12, 15])
 
+
+
+class CrownInEmptySlot(unittest.TestCase):
+    def test_a_crown_marker_does_not_make_a_monster(self):
+        from PIL import Image
+        p = Path(__file__).resolve().parent.parent / "captures" / "shop_crown_in_empty_slot.png"
+        if not p.exists():
+            self.skipTest("capture not here")
+        st = reader.read_state(Image.open(p))
+        self.assertEqual(st["problems"], [])
+        self.assertIsNone(st["team"][1])

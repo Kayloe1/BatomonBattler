@@ -109,8 +109,9 @@ SCREENS: dict[str, list[tuple[int, int, tuple[int, int, int]]]] = {
                  (1229, 768, (104, 64, 24)), (1400, 800, (200, 64, 40))],
     # "Select a trinket.": trinket cards over the dimmed shop, HIDE on the left
     # (over plain black after an event's gift): so the white card faces and the pink TRINKET tag
-    "trinket_pick": [(100, 1215, BLUE), (460, 1300, PINK), (560, 320, (255, 255, 255)),
-                     (1280, 320, (255, 255, 255)), (600, 460, (233, 206, 228))],
+    # (a single trinket, e.g. a Super Rare gift, sits in the middle card's place: so the middle card)
+    "trinket_pick": [(100, 1215, BLUE), (460, 1300, PINK), (1280, 320, (255, 255, 255)),
+                     (1320, 460, (233, 206, 228))],
     # Trainer pick: three yellow card headers over the "Select a trainer" box
     "trainer_pick": [(820, 222, YELLOW), (1483, 222, YELLOW), (2146, 222, YELLOW), (460, 1300, PINK),
                      (100, 1215, (14, 14, 14))],
@@ -131,9 +132,9 @@ SCREENS: dict[str, list[tuple[int, int, tuple[int, int, int]]]] = {
     # Confirm (grey until a monster is clicked) and Back below them.
     "select_target": [(1500, 410, (255, 189, 8)), (1500, 760, PINK), (1350, 1330, RED), (1700, 1330, RED),
                       (400, 210, (255, 189, 8))],
-    # Title screen: the logo, the dragon silhouette and the dark "PRESS ANY KEY TO START" label
-    "title": [(768, 240, (237, 103, 250)), (1408, 240, (67, 249, 245)), (1280, 739, (111, 49, 71)),
-              (890, 1045, (55, 55, 55)), (1650, 1045, (55, 55, 55))],
+    # Title screen: the logo and the dragon silhouette (the dark "PRESS ANY KEY TO START" label is not
+    # always shown: it was missing on a fresh start, 2026-11-13, and the bot stopped there)
+    "title": [(768, 240, (237, 103, 250)), (1408, 240, (67, 249, 245)), (1280, 739, (111, 49, 71))],
     # "Cash In": a trinket dialog (blue header, white body) with one red button, shop dimmed behind it
     "cash_in": [(1280, 255, (0, 132, 189)), (1280, 560, (255, 255, 255)), (1152, 1020, RED),
                 (1408, 1046, RED), (25, 1315, (22, 22, 23))],
@@ -484,14 +485,17 @@ def trinket_name_mask(pic: np.ndarray, i: int) -> np.ndarray | None:
 
 def read_trinket_pick(pic: np.ndarray) -> dict:
     """How many trinket cards are offered, and their names where readable."""
-    names = []
+    names, places = [], []
     for i in range(3):
         mask = trinket_name_mask(pic, i)
         if mask is None:
             continue
         text = store().read("caps", mask, space_gap=6)
         names.append(resolve(text, TRINKET_NAMES, ignore_case=True))
-    return {"trinkets": names, "problems": [] if names else ["trinket pick: no cards found"]}
+        places.append(i)
+    # "card_places": where each offered card sits (0 left, 1 middle, 2 right); one card sits in the middle
+    return {"trinkets": names, "card_places": places,
+            "problems": [] if names else ["trinket pick: no cards found"]}
 
 
 # ---- Trainer pick: three trainer cards, click one ----
@@ -524,6 +528,82 @@ def detect_screen(pic: np.ndarray) -> str:
         if all(_near(pic[y, x], colour, SCREEN_TOL) for x, y, colour in points):
             return name
     return "unknown"
+
+
+# ---- Info panel: hovering a monster on the shop screen shows its card on the right ----
+INFO_TITLE: Box = (1925, 182, 2545, 238)        # blue bar: NAME ... $sell RARITY
+INFO_NAME: Box = (1935, 188, 2300, 232)
+INFO_RARITY: Box = (2440, 188, 2540, 232)
+INFO_TYPE: Box = (2240, 356, 2400, 400)          # white word on the type badge (one type seen so far)
+INFO_COOLDOWN: Box = (1990, 575, 2080, 630)      # "3.6" above "sec", dark grey
+INFO_ACTIVE: Box = (2130, 580, 2500, 690)        # coloured lines: "Deal 5 damage", "Burn 5"
+INFO_PASSIVE: Box = (1950, 760, 2520, 1010)      # "On Cast" + text; read by eye from the saved picture
+INFO_PANEL: Box = (1900, 170, 2560, 1050)
+INFO_DARK = (82, 82, 90)
+# Active-line colour (same as the Stats window's) -> the stat it gives
+INFO_LINE_STAT = {"dealt": "damage", "healed": "heal", "inflicted": "poison", "inflicted_shock": "shock",
+                  "inflicted_burn": "burn", "shielded": "shield"}
+TYPE_NAMES = ["Bug", "Dark", "Dragon", "Electric", "Fairy", "Fire", "Flying", "Grass", "Ice", "Normal",
+              "Psychic", "Rock", "Steel", "Toxic", "Water", "Ghost", "Fighting", "Ground", "Light"]
+
+
+def is_info_panel(pic: np.ndarray) -> bool:
+    """The hover panel is showing: its blue title bar and white body."""
+    return bool(_near(pic[200, 2300], (0, 132, 189), 12) and _near(pic[300, 1990], (255, 255, 255), 6)
+                and _near(pic[200, 1960:2500], (0, 132, 189), 12).mean() > 0.3)
+
+
+def _match_masked(read: str, names: list[str]) -> str | None:
+    """The one name that fits a read word where '?' is any letter ("?IRE" -> Fire); stray marks
+    from a badge edge ("? ?IRE") are dropped first."""
+    import re
+    words = [w for w in read.split() if len(w.strip("?")) >= 2]
+    for w in words:
+        rx = re.compile("^" + re.escape(w).replace(r"\?", ".") + "$")
+        hits = [n for n in names if rx.match(n.upper())]
+        if len(hits) == 1:
+            return hits[0]
+    return None
+
+
+def read_info_panel(pic: np.ndarray) -> dict | None:
+    """The hovered monster's card: {"name", "rarity", "type", "cooldown", "stats", "raw"} or None.
+
+    Learned 2026-11-13 from Pyrokami (a Jinto monster an event gave). The name and rarity are in the
+    "caps" font; the active lines use the Stats window's colours and digits; the passive is not read
+    (its words are mostly unknown glyphs), so the caller saves the panel picture for a person to read."""
+    if not is_info_panel(pic):
+        return None
+    s = store()
+    raw = {}
+    raw["name"] = s.read("caps", glyphs.white(crop(pic, INFO_NAME)), space_gap=7).strip()
+    raw["rarity"] = s.read("caps", glyphs.white(crop(pic, INFO_RARITY)), space_gap=7).strip()
+    raw["type"] = s.read("caps", glyphs.white(crop(pic, INFO_TYPE)), space_gap=7).strip()
+    name = resolve(raw["name"].title(), MONSTER_NAMES) or (raw["name"].title() if "?" not in raw["name"] else None)
+    rarity = next((r for r in RARITIES if r.upper() == raw["rarity"]), None)
+    mtype = _match_masked(raw["type"], TYPE_NAMES)
+    # cooldown: digits plus a small dot glyph
+    cd_mask = _near(crop(pic, INFO_COOLDOWN), INFO_DARK, 20)
+    cd = ""
+    for g in glyphs.segment(cd_mask, min_pixels=4):
+        if g.bitmap.sum() < 60 and g.bitmap.shape[0] < 14:
+            cd += "."
+        else:
+            cd += s.classify("statsdigit", g.bitmap)[0]
+    raw["cooldown"] = cd
+    try:
+        cooldown = float(cd)
+    except ValueError:
+        cooldown = None
+    stats: dict[str, int] = {}
+    for kind, words in _stats_bands(crop(pic, INFO_ACTIVE)):
+        stat = INFO_LINE_STAT.get(kind)
+        for w in words:
+            txt = "".join(s.classify("statsdigit", g.bitmap)[0] for g in w)
+            if stat and txt.isdigit():
+                stats[stat] = int(txt)
+    raw["stats"] = dict(stats)
+    return {"name": name, "rarity": rarity, "type": mtype, "cooldown": cooldown, "stats": stats, "raw": raw}
 
 
 def is_stats_window(pic: np.ndarray) -> bool:
@@ -966,9 +1046,13 @@ def _read_battle_slot(pic: np.ndarray, side: int, i: int, problems: list[str]) -
     # "LV", ".", digit: the digit is the third piece (a sprite pixel of the label colour can follow it)
     level_text = store().classify("level", parts[2].bitmap)[0] if len(parts) >= 3 else ""
     level = _to_int(level_text)
+    badges = read_stat_badges(pic, owned_badge_band(box))
+    if not parts and not badges:
+        # no "LV." label and no badges: an empty slot with a small marker in it (a yellow crown in
+        # a team slot, 2026-11-13), not a monster
+        return None
     if level is None:
         problems.append(f"{where}: cannot read level ('{level_text}')")
-    badges = read_stat_badges(pic, owned_badge_band(box))
     if any(b["value"] is None for b in badges):
         problems.append(f"{where}: cannot read a stat badge")
     name, dist = match_battle_sprite(pic, box, mirrored=side == 1)
@@ -1262,9 +1346,13 @@ def _read_owned_slot(pic: np.ndarray, box: Box, where: str, problems: list[str])
     # "LV", ".", digit: the digit is the third piece (a sprite pixel of the label colour can follow it)
     level_text = store().classify("level", parts[2].bitmap)[0] if len(parts) >= 3 else ""
     level = _to_int(level_text)
+    badges = read_stat_badges(pic, owned_badge_band(box))
+    if not parts and not badges:
+        # no "LV." label and no badges: an empty slot with a small marker in it (a yellow crown in
+        # a team slot, 2026-11-13), not a monster
+        return None
     if level is None:
         problems.append(f"{where}: cannot read level ('{level_text}')")
-    badges = read_stat_badges(pic, owned_badge_band(box))
     if any(b["value"] is None for b in badges):
         problems.append(f"{where}: cannot read a stat badge")
     name, dist = match_sprite(rgb)

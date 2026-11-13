@@ -501,6 +501,8 @@ class Battle:
             u.stats["damage"] += p
         elif name == "Pebbler":
             u.stats["shield"] += p
+        elif name == "Pyrokami":          # Jinto: "On Cast: +10 Burn for this battle"
+            u.stats["burn"] += p
         elif name in ("Stingarde", "Electranade", "Pyronade"):
             if not u.shiny:          # a Shiny copy keeps casting (Shiny Stingarde: 3 casts, 450 damage)
                 self.knockout(u)

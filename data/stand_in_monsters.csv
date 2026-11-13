@@ -1,0 +1,2 @@
+name,cost,rarity,types,cooldown_s,active,passive,source
+Unknown Rare,30,Rare,Unknown,5.0,Deal 1 damage,,"Stand-in for a monster the reader cannot name (a foreign or event-only monster not in the data yet). Its badges (read from the screen) replace these numbers; the cooldown is the typical Rare's (median 4.2 s, mean 5.0 s); cost is the median Rare's. No passive. Never in the shop. 2026-11-13."

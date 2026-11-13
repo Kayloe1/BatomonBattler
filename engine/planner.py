@@ -157,7 +157,22 @@ class Planner:
         return self.ev.score(team, s.day, k or self.p.k_final, hp=self._hp(s, s.day), trainer=s.trainer,
                              trinkets=s.trinkets).win
 
-    def extras(self, s: RunState, bench: list[Unit | None]) -> float:
+    # Cards a run sees before the next day or two: ~4 monster cards a shop, a few shops a day, two days.
+    CARDS_AHEAD = 32
+
+    def third_copy_chance(self, s: RunState, name: str) -> float:
+        """Chance that one more copy of `name` shows up in the shops of the next day or two.
+        Rarer monsters are less likely: a Super Rare at 20% odds among 13 Super Rares is ~1.5% a card."""
+        sp = data.species(name)
+        if sp is None or sp.foreign:
+            return 0.0
+        odds = s.odds or data.rank_odds(s.rank)
+        r = data.RARITIES.index(sp.rarity)
+        n = max(1, len(data.by_rarity(sp.rarity)))
+        p_card = (odds[r] / 100.0) / n
+        return 1.0 - (1.0 - p_card) ** self.CARDS_AHEAD
+
+    def extras(self, s: RunState, bench: list[Unit | None], team: list[Unit | None] | None = None) -> float:
         # money and what the monsters would sell for, counted up to a cap: beyond it,
         # saved money buys nothing that today's spending could not
         resale = sum(u.sell_price() for _, _, u in s.owned())
@@ -167,14 +182,23 @@ class Planner:
         for _, _, u in s.owned():
             if u.level == 1 and u.name:
                 counts[u.name] = counts.get(u.name, 0) + 1
+        fielded = [u for u in (team or []) if u is not None]
+        weakest = min((power(u) for u in fielded), default=0.0) if len(fielded) >= 6 else 0.0
         for name, c in counts.items():
             if c >= 2:
                 sp = data.species(name)
-                v += self.p.copy_progress * (1 + data.RARITIES.index(sp.rarity) if sp else 1)
+                # a pair is worth its level-up only if the third copy is likely to show up and the
+                # level-2 monster would play (2026-11-13: a second Dracana bought for $40 for this
+                # bonus alone, and the pair sat on the bench; the bonus grew with rarity although a
+                # rarer third copy is less likely)
+                if power(model.new_unit(name, 0, 2)) <= weakest:
+                    continue
+                v += (self.p.copy_progress * (1 + data.RARITIES.index(sp.rarity) if sp else 1)
+                      * self.third_copy_chance(s, name))
         return v
 
     def quick(self, s: RunState, team, bench) -> float:
-        v = self.team_score(s, team, self.p.k_quick) + self.extras(s, bench)
+        v = self.team_score(s, team, self.p.k_quick) + self.extras(s, bench, team)
         if self.p.power_weight:
             v += self.p.power_weight * math.log1p(sum(power(u) for u in team if u is not None))
         return v
@@ -234,9 +258,11 @@ class Planner:
         movers = (fresh + others)[:2]
         if not movers:
             return best_t, (best_b + [None] * data.BENCH_SLOTS)[:data.BENCH_SLOTS]
-        # try the new monster (then the strongest bench monster) in every team slot
+        # try the new monster (then the strongest bench monster) in every team slot; each swap builds
+        # on the best arrangement so far (a merge of two fielded copies frees a second team slot)
         for i in movers:
-            if bench[i].name is None:
+            team, bench = best_t, best_b
+            if bench[i] is None or bench[i].name is None:
                 continue
             for j in range(6):
                 if team[j] is not None and team[j].name is None:
@@ -246,6 +272,23 @@ class Planner:
                 v = f(t2)
                 if v > best_v + (1e-9 if i in fresh else self.p.swap_gain):
                     best_t, best_b, best_v = t2, b2, v
+        # an empty team slot left: fill it with the bench monster that helps most (2026-11-13: a third
+        # Noxnimbus merged two fielded copies, the second slot stayed empty and every level-up of a
+        # fielded pair looked like losing a monster)
+        while None in best_t:
+            j = best_t.index(None)
+            best_fill = None
+            for i, u in enumerate(best_b):
+                if u is None or u.name is None:
+                    continue
+                t2, b2 = list(best_t), list(best_b)
+                t2[j], b2[i] = u, None
+                v = f(t2)
+                if best_fill is None or v > best_fill[0]:
+                    best_fill = (v, t2, b2)
+            if best_fill is None or best_fill[0] < best_v - 1e-9:
+                break
+            best_v, best_t, best_b = best_fill
         rest = [u for u in best_b if u is not None]
         if len(rest) > data.BENCH_SLOTS:          # cannot happen in the game; keep the strongest
             rest = sorted(rest, key=power, reverse=True)[:data.BENCH_SLOTS]
@@ -358,15 +401,15 @@ class Planner:
         for k, u in enumerate(s.bench):
             if u is None or not self._sellable(s, u) or u.sell_price() <= 0 and u.growth():
                 continue
-            if u.name in on_sale:
-                continue
+            if u.name in on_sale or any(o is u for o in team):
+                continue                         # a third copy is for sale, or the arrangement fields it
             copies = sum(1 for o in owned if o.name == u.name and o.level == u.level)
             need = 3 if u.level == 1 else 2
             if u.level < 3 and copies >= need - 1:
                 nxt = model.new_unit(u.name, 0, u.level + 1)
                 if power(nxt) > 1.1 * weakest:
                     continue                     # a merge here would improve the team: worth holding
-            if power(u) > weakest and not any(o is u for o in team):
+            if power(u) > weakest:
                 # stronger than the weakest fielded monster: the arrangement will use it, not a dead weight
                 continue
             out.append((BENCH, k, u))
@@ -455,20 +498,41 @@ class Planner:
         return max(0, s.money - reserve)
 
     def _lock_choice(self, s: RunState, team, bench, base: float) -> str | None:
+        """Lock only for a card the bot would really buy tomorrow.
+
+        Locking keeps today's cards and gives up tomorrow's fresh shop. It used to be judged against
+        having $0 left, so nearly every shop with one card a little too dear was locked, and the next
+        morning the bot (comparing that card with everything else) bought it after only 5 of 18 locks
+        (logs up to 2026-11-13). Now tomorrow's first decision is run here: with tomorrow's money and
+        these cards, the best choice must be a card that is too dear today, and it must beat what a
+        fresh shop is expected to offer (a free reroll)."""
         if s.locked:
             return None
         tomorrow = s.money + data.income(s.day + 1)
-        for i, c in enumerate(s.shop):
-            if c is None or c.kind != "monster" or c.price <= s.money or c.price > tomorrow:
-                continue
-            t = replace(s.copy(), money=c.price)
-            if not model.can_buy(t, i):
-                continue
-            v_with, _, _ = self.evaluate_after(t, model.buy(t, i), team, bench)
-            gain = v_with - self.quick(replace(s.copy(), money=0), team, bench)
-            if gain > self.p.lock_gain:
-                return f"lock for {c.name} (${c.price}, worth {gain:+.3f})"
-        return None
+        dear = {c.name: i for i, c in enumerate(s.shop)
+                if c is not None and c.kind == "monster" and c.name and s.money < c.price <= tomorrow}
+        if not dear:
+            return None
+        t = replace(s.copy(), money=tomorrow, rerolls=0)
+        base_t = self.quick(t, team, bench)
+        best_label, best_v = None, base_t
+        for label, actions, states in self._candidates(t):
+            total = 0.0
+            for u in states:
+                v, team2, bench2 = self.evaluate_after(t, u, team, bench)
+                total += self.finish(u, team2, bench2, v)
+            v = total / len(states)
+            if v > best_v:
+                best_label, best_v = label, v
+        target = next((n for n in dear if best_label and (best_label.startswith(f"buy {n} $")
+                                                          or best_label.endswith(f"to buy {n}"))), None)
+        if target is None or best_v - base_t <= self.p.lock_gain:
+            return None
+        fresh = self._reroll_value(replace(t, free_rerolls=t.free_rerolls + 1), team, bench)
+        if fresh is not None and fresh >= best_v:
+            return None
+        c = s.shop[dear[target]]
+        return f"lock for {c.name} (${c.price}): tomorrow's best buy, worth {best_v - base_t:+.3f}"
 
     def final_layout(self, s: RunState):
         return self.arrange_full(s)

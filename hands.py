@@ -23,6 +23,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from PIL import Image
+
 import reader
 import window
 
@@ -209,6 +211,31 @@ class Hands:
             pyautogui.mouseUp()
             pyautogui.moveTo(*self.screen_point(PARK), duration=0.15)
         return [["click", x, y]]
+
+    def inspect(self, where: str, i: int) -> dict | None:
+        """Hover a team/bench monster and read the info panel that slides in on the right
+        (name, rarity, type, cooldown, active numbers). The panel picture is saved in
+        captures/info_panels/ so its passive can be read by a person. None if no panel showed."""
+        import numpy as np
+        box = reader.team_slot(i) if where == "team" else reader.bench_slot(i)
+        if self.dry_run:
+            return None
+        import pyautogui
+        self._focus()
+        pyautogui.moveTo(*self.screen_point(box), duration=0.15)
+        time.sleep(0.8)
+        self.look(save_if_unreadable=False)
+        pic = np.asarray(window.canonical_picture(self.last_image))
+        pyautogui.moveTo(*self.screen_point(PARK), duration=0.15)
+        panel = reader.read_info_panel(pic)
+        if panel is not None:
+            folder = CAPTURE_DIR / "info_panels"
+            folder.mkdir(parents=True, exist_ok=True)
+            path = folder / f"{panel.get('name') or 'unread'}_{datetime.now():%Y%m%d_%H%M%S}.png"
+            Image.fromarray(pic).save(path)
+            panel["capture"] = str(path.relative_to(CAPTURE_DIR.parent)).replace("\\", "/")
+            panel["slot_rgb"] = reader.crop(pic, box)
+        return panel
 
     def _drag(self, src: reader.Box, dst: reader.Box) -> list:
         x0, y0 = self.screen_point(src)
@@ -515,7 +542,7 @@ class Hands:
     def confirm_result(self) -> Result:
         """Press CONFIRM on the result box; the next shop, an event or the end of the run follows."""
         return self._press_and_wait("confirm result", "result", reader.RESULT_CONFIRM,
-                                    {"shop", "event", "run_over", "gift_box", "trinket_pick", "cash_in"}, 40)
+                                    {"shop", "event", "run_over", "gift_box", "trinket_pick", "cash_in", "overflow"}, 40)
 
     def select_target(self, where: tuple[str, int]) -> Result:
         """On "Select a target": click the monster in ("team"|"bench", i), then Confirm.
@@ -548,8 +575,17 @@ class Hands:
         return self._log(name, Result(after.get("screen") in wanted, f"now on '{after.get('screen')}'", before, after, clicks))
 
     def leave_title(self) -> Result:
-        """Click on the title screen ("press any key to start"); the main menu follows."""
-        return self._press_and_wait("leave title", "title", reader.TITLE_ANYWHERE, {"main_menu", "main_menu_continue", "shop", "new_run"}, 20)
+        """Click on the title screen ("press any key to start"); the main menu follows.
+
+        Right after the game starts, the title ignores clicks until its intro ends and the label shows
+        (2026-11-13: one click, then 20 s on the title). So click again, up to four times."""
+        wanted = {"main_menu", "main_menu_continue", "shop", "new_run"}
+        r = self._press_and_wait("leave title", "title", reader.TITLE_ANYWHERE, wanted, 8)
+        for _ in range(3):
+            if r.ok or self.dry_run or (r.after or {}).get("screen") != "title":
+                break
+            r = self._press_and_wait("leave title", "title", reader.TITLE_ANYWHERE, wanted, 8)
+        return r
 
     def continue_run(self) -> Result:
         """Press Continue on the main menu (a run is open); the run's current screen follows.
@@ -584,7 +620,7 @@ class Hands:
                            f"(mode={state.get('mode')}, screen={state.get('screen')})", before, state))
         clicks = self._click(reader.CONTINUE_CONFIRM)
         wanted = {"shop", "result", "event", "gift_box", "trinket_pick", "cash_in", "trainer_pick",
-                  "battle", "matchmaking"}
+                  "battle", "matchmaking", "overflow"}
         after = self.wait_for(wanted, 40)
         ok = after.get("screen") in wanted
         return self._log(name, Result(ok, f"Casual run continued; now on '{after.get('screen')}'", before, after, clicks))
@@ -592,7 +628,7 @@ class Hands:
     def cash_in(self) -> Result:
         """Press "Cash In" on a trinket dialog (e.g. Fake Diamond after a loss: gain money)."""
         return self._press_and_wait("cash in", "cash_in", reader.CASH_IN_BUTTON,
-                                    {"shop", "event", "run_over", "gift_box", "trinket_pick", "cash_in"}, 40)
+                                    {"shop", "event", "run_over", "gift_box", "trinket_pick", "cash_in", "overflow"}, 40)
 
     def start_casual_run(self) -> Result:
         """Start a new CASUAL Pantra run from the end-of-run screen or the New Run dialog.
@@ -654,8 +690,13 @@ class Hands:
 
     def pick_trinket(self, k: int) -> Result:
         """Click trinket card k (0 = left). The shop comes back, or another gift."""
-        return self._press_and_wait(f"pick trinket {k}", "trinket_pick", reader.trinket_card(k),
-                                    {"shop", "gift_box"}, 20)
+        # k counts the cards on show; a single card sits in the middle place (2026-11-13)
+        state = self.look()
+        places = state.get("card_places") or [0, 1, 2]
+        place = places[k] if k < len(places) else k
+        # a new day's monster (Swim Coach: a Water monster each day) can arrive with team and bench full
+        return self._press_and_wait(f"pick trinket {k}", "trinket_pick", reader.trinket_card(place),
+                                    {"shop", "gift_box", "overflow"}, 20)
 
     def choose_event(self, k: int) -> Result:  # may be followed by "select_target"
         """Click choice k (0 = top) on an event screen."""

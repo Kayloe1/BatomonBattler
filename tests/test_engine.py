@@ -9,7 +9,7 @@ from engine import data, model, opponents
 from engine.choices import pick_trainer, pick_trinket
 from engine.evaluate import Evaluator
 from engine.model import BENCH, TEAM, Card, RunState, new_unit
-from engine.planner import Params, Planner, drag_works, moves_to
+from engine.planner import power, Params, Planner, drag_works, moves_to
 
 FAST = Params(k_final=4, k_quick=3, reroll_samples=1, greedy_steps=1, final_rounds=1)
 
@@ -341,7 +341,15 @@ class WastefulPlay(unittest.TestCase):
         s.bench = [new_unit("Bumblebolt", 10), new_unit("Dribblet", 10), None, None]
         team, _ = p.arrange_full(s)
         sold = [u.name for _, _, u in p.dead_weight(s, team)]
-        self.assertIn("Bumblebolt", sold)
+        weakest = min(power(u) for u in team if u is not None)
+        for u in s.bench:
+            if u is None:
+                continue
+            if any(o is u for o in team) or power(u) > weakest:
+                self.assertNotIn(u.name, sold)    # played by the arrangement, or good enough to be
+            else:
+                self.assertIn(u.name, sold)
+        self.assertTrue(sold or all(any(o is u for o in team) or power(u) > weakest for u in s.bench if u))
 
     def test_a_pair_that_can_merge_is_kept_and_so_is_a_copy_on_sale(self):
         p = small_planner()
@@ -414,3 +422,44 @@ class ShinyCards(unittest.TestCase):
         s = RunState(day=3, money=30, shop=[model.Card("Stingarde", 10, "monster", shiny=True), None, None, None, None])
         t = model.buy(s, 0)
         self.assertTrue(any(u.shiny for _, _, u in t.owned()))
+
+
+class UnknownMonsters(unittest.TestCase):
+    def test_an_unnamed_monster_plays_as_the_stand_in(self):
+        u = model.unit_from_reader({"name": None, "level": 1, "stats": [
+            {"stat": "damage", "value": 5}, {"stat": "burn", "value": 5}]})
+        self.assertEqual(u.name, data.STAND_IN)
+        self.assertEqual((u.stat("damage"), u.stat("burn")), (5, 5))
+        self.assertNotIn(data.STAND_IN, [s.name for s in data.by_rarity("Rare")])   # never in the shop
+        from sim import data as sim_data
+        self.assertEqual(sim_data.species(data.STAND_IN).levels[1].cooldown, 5.0)
+
+    def test_the_dragon_egg_pattern_stays_unnamed(self):
+        u = model.unit_from_reader({"name": None, "level": 1, "stats": [{"stat": "damage", "value": 1}]})
+        self.assertIsNone(u.name)
+
+
+class MergePlacement(unittest.TestCase):
+    def test_a_merge_of_two_fielded_copies_leaves_no_empty_team_slot(self):
+        # 2026-11-13: a third Noxnimbus merged the two on the team; the second freed slot stayed empty,
+        # so every level-up of a fielded pair was scored as losing a monster
+        p = small_planner()
+        s = RunState(day=8, rank=8, money=25, shop=[card("Noxnimbus"), None, None, None, None])
+        s.team = [new_unit("Sirenade", 30), new_unit("Noxnimbus", 25), new_unit("Dracana", 30),
+                  new_unit("Noxnimbus", 25), new_unit("Puffloon", 30), new_unit("Venopuff", 15)]
+        s.bench = [None, new_unit("Magmite", 15), new_unit("Aster", 30), None]
+        team, bench = p.arrange_full(s)
+        t = model.buy(s, 0)
+        team2, bench2 = p.place(t, team, bench)
+        self.assertNotIn(None, team2)
+        self.assertIn(("Noxnimbus", 2), [(u.name, u.level) for u in team2])
+
+
+class PairBonus(unittest.TestCase):
+    def test_a_rarer_third_copy_is_less_likely(self):
+        p = small_planner()
+        s = RunState(day=10, rank=10)
+        common = p.third_copy_chance(s, "Mosslug")
+        early = p.third_copy_chance(RunState(day=1, rank=1), "Mosslug")
+        self.assertGreater(early, common)                  # Commons are rare in late shops
+        self.assertEqual(p.third_copy_chance(s, "Pyrokami"), 0.0)   # foreign: never in the shop

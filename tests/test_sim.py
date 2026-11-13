@@ -31,7 +31,11 @@ EMPTY = team([])
 class Data(unittest.TestCase):
     def test_all_pantra_species_load(self):
         sp = data.load_species()
-        foreign = {"Rhizuka", "Ignit", "Talonite", "Wishwash"}   # data/foreign_monsters.csv
+        import csv
+        foreign = set()                       # monsters of other regions (learned in play) and the stand-in
+        for f in ("foreign_monsters.csv", "stand_in_monsters.csv"):
+            with open(data.DATA / f, newline="", encoding="utf-8") as fh:
+                foreign |= {r["name"] for r in csv.DictReader(fh)}
         self.assertEqual(len([n for n in sp if n not in data.EXTRA_UNITS and n not in foreign]), 64)
         for s in sp.values():
             for lv in (1, 2, 3, 4):
