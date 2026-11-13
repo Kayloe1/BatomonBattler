@@ -190,11 +190,15 @@ def build_unit(side: int, slot: int, spec: dict, trainer: str | None, trinkets: 
                 unit.stats["damage"] += 20
             elif t == "Terrarium" and "Bug" in unit.types:
                 unit.stats["damage"] *= 1.2
-            elif t == "Small Club" and unit.cooldown >= 5:
-                unit.stats["damage"] *= 1.2
-            elif t == "Giant Club" and unit.cooldown >= 5:
+        # Clubs stack additively: two Giant Clubs gave x2.4, not x1.7^2 (Cobrex Lv2 Shiny: 600 x 1.2 x 2.4
+        # = 1728 on its card, 2026-11-12). Small Club is assumed to stack the same way.
+        if unit.cooldown >= 5:
+            n_small, n_giant = trinkets.count("Small Club"), trinkets.count("Giant Club")
+            if n_small:
+                unit.stats["damage"] *= 1 + 0.2 * n_small
+            if n_giant:
                 for s in data.STATS:
-                    unit.stats[s] *= 1.7
+                    unit.stats[s] *= 1 + 0.7 * n_giant
     elif trainer == "Chef" and len(types) == 1 and "Fire" not in types:
         unit.types.append("Fire")
     # Cooldown and Multicast bonuses (not visible on badges).
