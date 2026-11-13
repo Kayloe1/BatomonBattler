@@ -548,8 +548,17 @@ class Hands:
         return self._log(name, Result(after.get("screen") in wanted, f"now on '{after.get('screen')}'", before, after, clicks))
 
     def leave_title(self) -> Result:
-        """Click on the title screen ("press any key to start"); the main menu follows."""
-        return self._press_and_wait("leave title", "title", reader.TITLE_ANYWHERE, {"main_menu", "main_menu_continue", "shop", "new_run"}, 20)
+        """Click on the title screen ("press any key to start"); the main menu follows.
+
+        Right after the game starts, the title ignores clicks until its intro ends and the label shows
+        (2026-11-13: one click, then 20 s on the title). So click again, up to four times."""
+        wanted = {"main_menu", "main_menu_continue", "shop", "new_run"}
+        r = self._press_and_wait("leave title", "title", reader.TITLE_ANYWHERE, wanted, 8)
+        for _ in range(3):
+            if r.ok or self.dry_run or (r.after or {}).get("screen") != "title":
+                break
+            r = self._press_and_wait("leave title", "title", reader.TITLE_ANYWHERE, wanted, 8)
+        return r
 
     def continue_run(self) -> Result:
         """Press Continue on the main menu (a run is open); the run's current screen follows.
