@@ -5,17 +5,63 @@ for the bot. Each section is written as it happened; the summary of lessons is a
 
 ## Lessons for the bot (summary)
 
-_(filled in at the end)_
+Two hand-played Casual runs: Run 1 (Egg Breeder) ended on Day 13 with 7 badges; Run 2 (Witch) **won**
+(10 badges on Day 14). A third run was then played by the bot itself (`play.py --new-run`) with the changes
+below; see the end of the log.
+
+**Mechanics confirmed tonight** (details and evidence in the log below):
+- Shiny: each species changes differently. Self-knockout monsters lose the knockout (Stingarde); monsters with
+  no passive gain "+1 stat per level permanently at battle start" (Magmite, Venopuff); others get ~+20% on a
+  key number (Stalagrove 15->18%, Cobrex Poison 300->360, Geminiss 50->60%, Blixie 1->1.2x, Torrantler
+  cooldown 7->5.5 s). Shiny survives merges. Shiny cards are priced like plain ones.
+- Merges keep the largest growth and the team copy's slot. **Gift rarity = merged monster's rarity**
+  (Common -> Common trinkets, Rare -> Rare, Legendary -> Legendary); Treasure Map raises it one tier.
+- Event level-ups keep permanent growth. Candies and Growth/Shiny Potions can hit **bench** monsters.
+- Using an item refills its shop slot with a new card. A Coupon only discounts the current shop.
+- Events come after Days 2, 5 and 8 (none after 11). The last-life rescue offers a Super Rare gift / a random
+  Lv2 Super Rare / **Mysterious Charm (+25% HP)**. **The +25% HP the engine assumed after every rescue comes
+  from that Charm**, not the rescue (the old simple rules always took it).
+- Trainer HP Day 14 = 63000. Two Giant Clubs stack additively (x2.4). Link Cable makes Gaiadrasil add up
+  the whole team, and Gaiadrasil counts allies' Ongoing damage (Fumungus's Poison damage).
+- Simulator timing: "Triggered" counts casts (not Multicast hits); "Dealt" includes the Shock bonus; Shock
+  gained at an instant counts from the next instant; all casts at an instant resolve before deaths.
+- The simulator's win chances were reasonably calibrated over 20 battles (~62% predicted, 60% won).
+
+**Strategy lessons:**
+- Day 1-2: Poison (Venopuff) beats flat damage; a single Venopuff beat two Guardiants.
+- Mid game: **permanent growers win runs** (Fumungus+Noxalith, Thorntail, Warhorn, Boxing Glove).
+  Late game: Burn burst (Lignite+Magmalith, Blazewing Lv3) kills in ~15 s; slow carries lose to it.
+- **Multiplying trinkets on one grown carry** (Giant Club x2, Winged Crown, Zenith Stone) turned Run 2 around.
+- Random Legendaries without synergy (Legendary Potion) were weak; Legendary merges were strong (Legendary gifts).
+- Rigged Dice + Mirror Potion make "LV 2" copies show up often late.
+
+**Changed in the code tonight** (all with tests; `python -m unittest discover tests`, `python -m sim --check`):
+- Reader: Shiny team/bench monsters (colour histogram vs `Name@shiny` templates) and the SHINY tag on shop
+  cards; bought Shiny cards are learned as `Name@shiny`; new sprites for 7 Legendaries/Shinies.
+- Model/engine: `shiny` flag on units and cards, kept through merges; events value "Turn a monster SHINY",
+  Mysterious Charm and any "+N HP"/"+N% HP" trinket; trinket picks apply stat trinkets to badge stats
+  (Giant Club was scored 0 before); HP bonus only with the Charm; Day 14 HP; candies reach level 4 and hit
+  the bench; Witch potions, Ultra Candy, Legendary/Mirror/Glimmer Potions in the data.
+- Simulator: the timing fixes above, Shiny effects, additive clubs, Gaiadrasil counting Ongoing damage;
+  5 new recorded cases in `sim/cases/`.
+- Data: `data/special_monsters.csv` (Batopedia "???" tab), new trinkets and items.
+- **The game window was resized** with `SetWindowPos` so its client area is exactly 2560 x 1440 (it was
+  2560 x 1600 with black bars); the reader handles both.
 
 ## To build (found tonight, not built yet)
-1. **Shiny detection.** The reader names a Shiny monster like the normal one (same badges, blue/sparkly
-   sprite). The model needs a `shiny` flag passed to the sim's new `"shiny"` key, and `engine/events.py`
-   should value "Turn a monster SHINY" (Shiny Stingarde: ~4% -> ~80% Day 3 win chance in the sim pool).
-2. **Purple Egg sprite.** Egg Breeder's egg is unnamed by the reader. Sprites cut from the bench matched the
+1. **Purple Egg sprite.** Egg Breeder's egg is unnamed by the reader. Sprites cut from the bench matched the
    opponent's Dragon Egg in `tests/test_reader.py`, so they were deleted; the egg needs its own handling
    (it should stay on the bench and never be sold).
-3. Using an item refills its shop slot with a new card; check `engine/model.py` models this.
-4. The engine's "feed and sell" Bug move scored above keeping a strong Bug (Stingarde) on Day 2.
+2. Item-slot refill is not modelled (`model.use_item` leaves the slot empty); using a free item is slightly
+   better than the engine thinks.
+3. Event-only monsters are unknown to the simulator: Ignit (Burn 1, evolves on a victory into something
+   unseen), Talonite, Wishwash, Cosmivore, Faebloom, Omnichrome (`data/special_monsters.csv`), Dryadell.
+4. Mirror, Glimmer and Legendary Potions are in the data but not modelled (paid unmodelled items are skipped).
+   Mirror Potion is a strong merge tool late; Legendary Potion only helps with empty slots and synergy.
+5. Permanent growth is not valued forward: the planner scores today and tomorrow with today's badges, so
+   Thorntail/Fumungus/Warhorn growth is undervalued (they carried both runs).
+6. The engine's "feed and sell" Bug move scored above keeping a strong Bug (Stingarde) on Day 2.
+7. Opponent Shiny monsters in battle are not read (`match_battle_sprite` has no Shiny templates).
 
 ## Log
 
