@@ -234,9 +234,11 @@ class Planner:
         movers = (fresh + others)[:2]
         if not movers:
             return best_t, (best_b + [None] * data.BENCH_SLOTS)[:data.BENCH_SLOTS]
-        # try the new monster (then the strongest bench monster) in every team slot
+        # try the new monster (then the strongest bench monster) in every team slot; each swap builds
+        # on the best arrangement so far (a merge of two fielded copies frees a second team slot)
         for i in movers:
-            if bench[i].name is None:
+            team, bench = best_t, best_b
+            if bench[i] is None or bench[i].name is None:
                 continue
             for j in range(6):
                 if team[j] is not None and team[j].name is None:
@@ -246,6 +248,23 @@ class Planner:
                 v = f(t2)
                 if v > best_v + (1e-9 if i in fresh else self.p.swap_gain):
                     best_t, best_b, best_v = t2, b2, v
+        # an empty team slot left: fill it with the bench monster that helps most (2026-11-13: a third
+        # Noxnimbus merged two fielded copies, the second slot stayed empty and every level-up of a
+        # fielded pair looked like losing a monster)
+        while None in best_t:
+            j = best_t.index(None)
+            best_fill = None
+            for i, u in enumerate(best_b):
+                if u is None or u.name is None:
+                    continue
+                t2, b2 = list(best_t), list(best_b)
+                t2[j], b2[i] = u, None
+                v = f(t2)
+                if best_fill is None or v > best_fill[0]:
+                    best_fill = (v, t2, b2)
+            if best_fill is None or best_fill[0] < best_v - 1e-9:
+                break
+            best_v, best_t, best_b = best_fill
         rest = [u for u in best_b if u is not None]
         if len(rest) > data.BENCH_SLOTS:          # cannot happen in the game; keep the strongest
             rest = sorted(rest, key=power, reverse=True)[:data.BENCH_SLOTS]

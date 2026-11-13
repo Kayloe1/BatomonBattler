@@ -437,3 +437,19 @@ class UnknownMonsters(unittest.TestCase):
     def test_the_dragon_egg_pattern_stays_unnamed(self):
         u = model.unit_from_reader({"name": None, "level": 1, "stats": [{"stat": "damage", "value": 1}]})
         self.assertIsNone(u.name)
+
+
+class MergePlacement(unittest.TestCase):
+    def test_a_merge_of_two_fielded_copies_leaves_no_empty_team_slot(self):
+        # 2026-11-13: a third Noxnimbus merged the two on the team; the second freed slot stayed empty,
+        # so every level-up of a fielded pair was scored as losing a monster
+        p = small_planner()
+        s = RunState(day=8, rank=8, money=25, shop=[card("Noxnimbus"), None, None, None, None])
+        s.team = [new_unit("Sirenade", 30), new_unit("Noxnimbus", 25), new_unit("Dracana", 30),
+                  new_unit("Noxnimbus", 25), new_unit("Puffloon", 30), new_unit("Venopuff", 15)]
+        s.bench = [None, new_unit("Magmite", 15), new_unit("Aster", 30), None]
+        team, bench = p.arrange_full(s)
+        t = model.buy(s, 0)
+        team2, bench2 = p.place(t, team, bench)
+        self.assertNotIn(None, team2)
+        self.assertIn(("Noxnimbus", 2), [(u.name, u.level) for u in team2])
