@@ -132,3 +132,27 @@ _(filled in at the end)_
   Warhorn. The bot should value permanent growth that compounds across days much more than the one-battle sim does.
 - Several of the engine's choices were wrong because it could not see things: Shiny Stingarde (sell it),
   Fumungus (unnamed), Ignit, Mysterious Charm, Link Cable + Gaiadrasil.
+
+### Run 2 (Casual, Witch; choice was Witch / Mad Scientist / Rich Lady)
+- **Witch**: the first shop each day has a Potion. Seen: **Summon Potion** ($10, Common: a random level 2
+  Common monster with no sell value; gave Dribblet Lv2, then Pebbler Lv2), **Gold Potion** ($0: +$10),
+  **Growth Potion** ($1: every monster, **bench included**, gets a small random Damage, Poison or Burn),
+  **Shiny Potion** ($0, Rare: a random monster becomes Shiny; it picked the benched Ignit).
+- Day 1: Summon Potion + Venopuff (sim 96%) won. Day 2: Gold Potion, 2 Magmites, Dribblet; Gold Potion's
+  slot refilled with a Stingarde; won. Berry event again -> Shiny on Venopuff: **Shiny Venopuff = "On Battle
+  Start: +1 Poison permanently"**. Day 3: "LV 2" Magmite merge -> Common gift (Training Weights +100 HP /
+  Boxing Glove "On Victory: team +5 Damage permanently" / Treasure Map "next gift one tier higher"); took
+  Boxing Glove. Won Day 3.
+- Day 4: "LV 2" Venopuff merge with the Shiny team copy: **the Lv2 is still Shiny and its bonus scales
+  ("+2 Poison permanently")**, and it kept its growth (Poison 9). Gift: Quick Flag / Gold Trophy / Treasure
+  Map; took Treasure Map. Lost Day 4 (they had 353/1400).
+- Day 5: Thorntail instead of the plain Stingarde (sim 46% -> 56%); then a **Shiny Stingarde card for $10**
+  appeared in the Gold Potion's refilled slot. Lost Day 5 (-3, 5 lives).
+- Event after Day 5: Ignit again; adopted. **Shiny Ignit = Poison 2 + Burn 1** (Shiny added Poison).
+- Day 6: Runerock (21% -> 35%) and a 2nd Runerock; won. Day 7: Formiqueen next to Commons; won at a 36% sim
+  estimate. Day 8: "LV 2" Runerock merge with Treasure Map: **the Uncommon Runerock gave a Rare gift** (Rigged
+  Dice / Power Bell / Mega Duplicator); took Rigged Dice ("[Unique] the first shop each day stocks only the
+  rarest monsters and items your shop rank allows"). Ignit on the team would have cost ~23% (sim 30% vs 53%),
+  so it was benched and the evolution is still unseen. Lost Day 8 to a Burn team (2 lives left).
+- **Sim calibration over both runs** (the sim's win chance for the team I fielded vs the result): about 62%
+  predicted on average and 60% actual over 20 battles. Misses both ways (lost at 73-76%, won at 35-36%).
