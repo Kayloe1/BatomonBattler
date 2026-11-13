@@ -1,2 +1,5 @@
 name,cost,rarity,types,cooldown_s,active,passive,source
 Rhizuka,30,Rare,Rock,15.0,Deal 200 damage,Trigger this when an ally applies Shield (Except other Rhizuka),"Jinto monster from the event choice 'Gain a foreign Rare monster. It can now appear in your shop.' (bot run, 2026-11-12). Card read in game: Rare, Rock, 15.0 s, Deal 200 damage; sells for $15. Cost guessed as $30 (twice the sell value)."
+Ignit,40,Rare,Fire,8.0,Burn 1,On Victory: Evolve,"Event-only (crying baby basilisk event); Batopedia ??? tab. The evolution was not seen; the simulator uses the base card only."
+Talonite,20,Rare,Flying/Rock,12.0,Deal 30 damage; Multicast 2,On Battle Start: +20 Shield permanently for each Rock ally and +1 Multicast permanently for each Flying ally,"Event-only; Batopedia ??? tab. The passive is not simulated."
+Wishwash,40,Super Rare,Water,3.5,Heal 150,On Battle Start: Gain a random non-unique Rare Trinket,"Event-only; Batopedia ??? tab. The passive is not simulated."

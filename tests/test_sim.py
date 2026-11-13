@@ -31,7 +31,7 @@ EMPTY = team([])
 class Data(unittest.TestCase):
     def test_all_pantra_species_load(self):
         sp = data.load_species()
-        foreign = {"Rhizuka"}                       # data/foreign_monsters.csv
+        foreign = {"Rhizuka", "Ignit", "Talonite", "Wishwash"}   # data/foreign_monsters.csv
         self.assertEqual(len([n for n in sp if n not in data.EXTRA_UNITS and n not in foreign]), 64)
         for s in sp.values():
             for lv in (1, 2, 3, 4):
