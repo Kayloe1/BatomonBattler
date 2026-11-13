@@ -118,8 +118,10 @@ class Planner:
         if s.hp_today:                        # what the screen shows beats the table
             return int(s.hp_today * data.hp_for_day(day) / data.hp_for_day(s.day))
         hp = data.hp_for_day(day)
-        # after the last-life rescue the trainer's HP was 25% higher (two runs)
-        return int(hp * 1.25) if s.rescue_used else hp
+        # +25% HP comes from the Mysterious Charm, one of the three rescue choices (2026-11-12:
+        # 34700 -> 43375 with it). Earlier runs saw it after every rescue because the simple
+        # rules always took the last choice, which is the Charm.
+        return int(hp * 1.25) if "Mysterious Charm" in s.trinkets else hp
 
     def team_score(self, s: RunState, team: list[Unit | None], k: int) -> float:
         today = self.ev.score(team, s.day, k, hp=self._hp(s, s.day), trainer=s.trainer, trinkets=s.trinkets)
