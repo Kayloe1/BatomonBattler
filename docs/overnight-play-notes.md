@@ -242,3 +242,11 @@ Legendary Potions modelled, and `Params.grow_next` (tomorrow is scored with one 
   carry (Thorntail 50 -> ~4000 with poison allies), and from Legendary merges, whose gifts are Legendary.
 - Rigged Dice + Mirror Potion is a merge engine late: Rigged Dice makes the first shop Legendary-only and
   Mirror Potion rolls owned species, so "LV 2" copies show up often.
+
+### Run 3 (Casual, Chemist; played by the bot, `play.py --new-run`)
+- The bot started the Casual run itself (Casual read twice before Confirm) and picked Chemist.
+- It stopped three times on things it had not seen, each fixed and taught: the foreign Rhizuka's level label
+  (a horn pixel read as a glyph), an unreadable "MASKED MAN" trainer card and "LOCKED BOX" trinket name,
+  and the OVERFLOW screen (an event's Shiny Saberhorn with team and bench full; sold a Frizzly by hand).
+- **Run over on Day 9 with 4 badges** (lost Days 4, 7, 8 and 9). The OVERFLOW handling did not come up again,
+  so it is tested on the saved capture only.
