@@ -142,8 +142,12 @@ class BattleResult:
 #    and Pyronade are assumed to work the same way)
 #  - monsters without a passive gain a small permanent growth at battle start
 #  - Stalagrove's 15% became 18% (x1.2 on its parameter)
+#  - other numbers go up by about 20%: Cobrex Poison 300 -> 360 (on the badge, so already read),
+#    Geminiss +50% -> +60% Shield, Blixie gives 1.2x its Burn instead of 1x, Torrantler's
+#    cooldown 7 -> 5.5 s (cards seen through a Glimmer Potion)
 SHINY_BATTLE_START = {"Magmite": {"shield": 10, "burn": 1}, "Venopuff": {"poison": 1}}
-SHINY_PARAM_MULT = {"Stalagrove": 1.2}
+SHINY_PARAM_MULT = {"Stalagrove": 1.2, "Geminiss": 1.2, "Blixie": 1.2}
+SHINY_COOLDOWN_MULT = {"Torrantler": 5.5 / 7.0}
 
 
 def build_unit(side: int, slot: int, spec: dict, trainer: str | None, trinkets: list[str]) -> Unit:
@@ -164,6 +168,8 @@ def build_unit(side: int, slot: int, spec: dict, trainer: str | None, trinkets: 
                 shiny=bool(spec.get("shiny", False)))
     if unit.shiny and unit.param and sp.name in SHINY_PARAM_MULT:
         unit.param *= SHINY_PARAM_MULT[sp.name]
+    if unit.shiny and sp.name in SHINY_COOLDOWN_MULT and "cooldown" not in spec:
+        unit.cooldown *= SHINY_COOLDOWN_MULT[sp.name]
     # Trainer / trinket bonuses that the badges would already show.
     if not given:
         if trainer == "Chef":
