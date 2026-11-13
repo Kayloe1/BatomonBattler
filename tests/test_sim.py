@@ -325,3 +325,13 @@ class ShinyEffects(unittest.TestCase):
         r = simulate(a, EMPTY, until=0.1)
         self.assertEqual(r.units[0][0]["stats"]["shield"], 50)    # 40 + 10
         self.assertEqual(r.units[0][1]["stats"]["poison"], 10)    # Lv2 8 + 2
+
+
+class GaiadrasilCountsOngoingDamage(unittest.TestCase):
+    def test_fumungus_poison_damage_is_counted(self):
+        # Fumungus (Ongoing: +200% of enemy Poison as Damage) next to Gaiadrasil: once the enemy
+        # is poisoned, Gaiadrasil's hit includes Fumungus's extra Damage (game, 2026-11-12).
+        a = team([mon("Fumungus", 2, poison=50), mon("Gaiadrasil")])
+        r = simulate(a, EMPTY, until=9.0)
+        fum, gaia = r.units[0]
+        self.assertGreater(gaia["dealt"], 50 * 2)        # more than Fumungus's own base Damage

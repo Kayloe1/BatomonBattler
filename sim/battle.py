@@ -339,7 +339,9 @@ class Battle:
         elif u.is_("Fumungus"):
             dmg += u.param / 100.0 * k * self.trainers[1 - u.side].poison
         elif u.is_("Gaiadrasil"):
-            dmg += u.param / 100.0 * k * sum(v.stats["damage"] for v in self.adjacent(u)
+            # allies' full Damage, Ongoing extras included (Fumungus's Poison-based Damage counted
+            # in the game: one cast hit 3375 where the allies' badges summed to ~2450, 2026-11-12)
+            dmg += u.param / 100.0 * k * sum(self.damage_of(v) for v in self.adjacent(u)
                                             if not v.is_("Gaiadrasil") and v.alive)
         return dmg
 
