@@ -123,6 +123,13 @@ Stops fixed on the way, each with a test:
 - Title screen: recognised without its blinking label, and clicked again while the intro ignores clicks.
 - Overflow is accepted after a trinket pick, result, cash-in or continue (Swim Coach's daily Water monster).
 
+- **Result: the Swim Coach Casual run won** (10 badges on day 11, 7 lives; lost only day 10).
+  Simulator vs this run: 5 of 5 checkable battles agree; days 2-4 match every Stats number exactly;
+  day 8 is 99 off per number (the opponent's shield monster: game 4630 shield, sim 3704).
+- Also fixed in this run: level-ups of two fielded copies were scored as losing a monster (`place` left
+  the second freed slot empty); a single-card trinket pick (middle place); a yellow crown in an empty
+  team slot read as a monster; the pair bonus (now chance of a third copy x whether level 2 would play).
+
 Done later in the night: Purple Egg named on team/bench (kept out of battle matching), Mirror / Glimmer /
 Legendary Potions modelled, and `Params.grow_next` (tomorrow is scored with one battle's permanent growth).
 
