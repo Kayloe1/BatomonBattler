@@ -156,3 +156,38 @@ _(filled in at the end)_
   so it was benched and the evolution is still unseen. Lost Day 8 to a Burn team (2 lives left).
 - **Sim calibration over both runs** (the sim's win chance for the team I fielded vs the result): about 62%
   predicted on average and 60% actual over 20 battles. Misses both ways (lost at 73-76%, won at 35-36%).
+- Event after Day 8: Dryad statue -> "Give a monster Grass typing, Gain Dryadell" / "Gain Mysterious Gem" /
+  "Gain Dryad's Charm". **Dryad's Charm = Legendary, "[Unique] +30% HP"** (Day 9 HP 11600 -> 15080).
+- Day 9 with **Rigged Dice**: the first shop was all Legendaries plus a **Legendary Potion ($5): "Fill your team
+  and bench with random Legendary monsters. They have no sell value."** Sold 7 monsters (keeping Thorntail and
+  Shiny Venopuff) and used it: 8 random Legendaries (2 Galvanine, 2 Draconarch, Stellagon, 2 Torrantler,
+  Gaiadrasil). Monsters from it sell for $0. Lost Day 9 badly (they kept 9584/11600): **random Legendaries
+  without synergy were not a strong team.**
+- Rescue: took the Super Rare trinket gift this time: Haste Orb / Blitz Bell (shop monsters +25% Cooldown
+  Speed) / Haste Crown (top middle +20% Cooldown Speed).
+- Day 10 (1 life): "LV 2" Draconarch merged the two potion copies: **potion monsters merge normally**, and the
+  Legendary merge gave **Legendary** trinkets: Candy Jar (Commons/Uncommons permanently level up to 3 at
+  battle start) / Barbell (+5000 HP) / **Zenith Stone (stat gains +80%)**; took Zenith Stone (Thorntail's
+  growth jumped). **Glimmer Potion ($6, Legendary): every monster in the shop this turn is Shiny.** Shiny
+  cards seen: Cobrex Poison 300 -> 360, Geminiss +50% -> +60% Shield, Blixie gives 1.2x its Burn, Torrantler
+  cooldown 7 -> 5.5 s. **Shiny is roughly +20% on the key number** for monsters that have one. Shiny Cobrex
+  replaced a Galvanine (sim 57% -> 75%); won Day 10.
+- Day 11: **Mirror Potion ($5, Legendary): "Roll a shop that contains only monsters on your team and bench"**
+  -> it offered a "LV 2" Galvanine (merge) and 2 Saberhorns. Legendary gift: Metronome / Mighty Bell (shop
+  monsters +300 Damage) / **Giant Club (monsters with a cooldown of 5 s or more have +70% stats)**. Giant Club
+  shows on cards at once, bench and shop included (Thorntail 888 -> 1510). Won Day 11.
+- Day 12: Saberhorn Lv2 merge -> Candy Jar / **Winged Crown ("[Unique] top middle monster +1 Multicast")** /
+  Metronome; Thorntail sits top middle, so it now hits twice. Won.
+- **No event after Day 11 in either run** (events after Days 2, 5 and 8; the rescue is its own screen).
+- Day 13: Cobrex Lv2 merge (Shiny kept) -> a **second Giant Club: they stack** (Thorntail 2349 -> 3316).
+  Mirror Potion again (no Gaiadrasil). Won (9 badges).
+- Day 14: **trainer HP is 63000 on Day 14** (the opponent's bar; ours was 81900 with Dryad's Charm). The
+  engine extrapolates 66220. Rank shows "Max". Won with 1216/81900 left -> **Run 2 won, 10 badges**:
+  "You are a Batomon champion!" with the same buttons as the run-over screen (the reader calls it
+  `run_over`; capture `captures/manual_run_won_champion.png`).
+
+### What Run 2 says about strategy
+- The comeback came from **trinkets that multiply** (Giant Club x2, Winged Crown, Zenith Stone) on one grown
+  carry (Thorntail 50 -> ~4000 with poison allies), and from Legendary merges, whose gifts are Legendary.
+- Rigged Dice + Mirror Potion is a merge engine late: Rigged Dice makes the first shop Legendary-only and
+  Mirror Potion rolls owned species, so "LV 2" copies show up often.

@@ -19,8 +19,9 @@ STATS = ("damage", "heal", "shield", "poison", "burn", "shock", "multicast")
 RARITIES = ("Common", "Uncommon", "Rare", "Super Rare", "Legendary")
 
 # Trainer HP by day (own bar; the enemy's matches it). Days 9+ from Run 14/18 on
-# build 25448953; past day 13 the ~40% daily growth is extrapolated.
-HP_BY_DAY = [300, 500, 800, 1400, 2400, 3800, 5700, 8300, 11600, 17300, 24900, 34700, 47300]
+# build 25448953; day 14 (63000) seen on the opponent bar 2026-11-12; past day 14 the growth
+# (~35-40% a day) is extrapolated.
+HP_BY_DAY = [300, 500, 800, 1400, 2400, 3800, 5700, 8300, 11600, 17300, 24900, 34700, 47300, 63000]
 
 
 def hp_for_day(day: int) -> int:
