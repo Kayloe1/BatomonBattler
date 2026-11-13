@@ -300,3 +300,18 @@ class OverflowScreen(unittest.TestCase):
         self.assertEqual([b["name"] for b in st["bench"]], ["Cicadence", "Cicadence", "Frizzly", "Frizzly"])
         self.assertEqual(st["overflow"]["level"], 1)
         self.assertEqual(st["problems"], [])
+
+
+class CardSeven(unittest.TestCase):
+    def test_coupon_price_seven_is_read(self):
+        # a Coupon took Mosslug to $7; the card font had no 7 until 2026-11-13
+        import numpy as np
+        import window
+        from PIL import Image
+        p = Path(__file__).resolve().parent.parent / "captures" / "unread_20261113_084204_238777.png"
+        if not p.exists():
+            self.skipTest("capture not here")
+        pic = np.asarray(window.canonical_picture(Image.open(p)))
+        st = reader.read_state(pic)
+        self.assertEqual(st["problems"], [])
+        self.assertEqual([s["price"] for s in st["shop"]], [0, 12, 7, 12, 15])
