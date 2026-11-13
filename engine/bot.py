@@ -14,10 +14,17 @@ MEMORY_FILE = Path(__file__).resolve().parent.parent / "logs" / "engine_memory.j
 
 
 class Brain:
-    def __init__(self, params: Params | None = None, pool_size: int = 24):
+    def __init__(self, params: Params | None = None, pool_size: int = 24, learned: bool = False):
         self.pools = opponents.pools(n=pool_size, seed=1)
         self.planner = Planner(Evaluator(self.pools), params or Params())
         self.memory = self._load()
+        self.learned = None
+        if learned:                      # fast policy tuned by practice runs (train/)
+            from train.policy import FastPolicy, load_theta
+            ev = self.planner.ev
+            self.learned = FastPolicy(load_theta(), evaluator=ev)
+            self.learned.layout_scorer = lambda day, trinkets: (
+                lambda team: self.planner.ev.score(team, day, 8, trinkets=trinkets).value)
 
     # -- memory that survives a restart of play.py --
     def _load(self) -> dict:
@@ -65,7 +72,8 @@ class Brain:
         return model.from_reader(state, self.memory)
 
     def shop_plan(self, state: dict) -> Plan:
-        return self.planner.decide(self.run_state(state))
+        s = self.run_state(state)
+        return (self.learned or self.planner).decide(s)
 
     def trinket(self, shop_state: dict | None, offered: list[str | None]) -> tuple[int, str]:
         s = self.run_state(shop_state) if shop_state else model.RunState()
