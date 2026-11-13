@@ -103,10 +103,14 @@ SCREENS: dict[str, list[tuple[int, int, tuple[int, int, int]]]] = {
     "result": [(100, 1215, BLUE), (460, 1300, PINK), (2300, 1215, RED)],
     # Event with up to three choices: SHOW TEAM (left), nothing on the right
     "event": [(100, 1215, BLUE), (460, 1300, PINK), (2300, 1215, (14, 14, 14)), (300, 600, (14, 14, 14))],
-    # "<monster> leveled up! ... gives you a gift.": a gift box over the dimmed shop
-    "gift_box": [(100, 1215, (19, 19, 21)), (2300, 1215, (19, 19, 21)), (460, 1300, PINK), (1300, 215, (55, 41, 2))],
+    # "<monster> gives you a gift.": the gift box itself, over the dimmed shop (after a level-up)
+    # or over plain black (after an event); so the box's colours, not the background
+    "gift_box": [(460, 1300, PINK), (1150, 800, (248, 112, 88)), (1350, 800, (224, 152, 72)),
+                 (1229, 768, (104, 64, 24)), (1400, 800, (200, 64, 40))],
     # "Select a trinket.": trinket cards over the dimmed shop, HIDE on the left
-    "trinket_pick": [(100, 1215, BLUE), (2300, 1215, (19, 19, 21)), (460, 1300, PINK), (1300, 215, (55, 41, 2))],
+    # (over plain black after an event's gift): so the white card faces and the pink TRINKET tag
+    "trinket_pick": [(100, 1215, BLUE), (460, 1300, PINK), (560, 320, (255, 255, 255)),
+                     (1280, 320, (255, 255, 255)), (600, 460, (233, 206, 228))],
     # Trainer pick: three yellow card headers over the "Select a trainer" box
     "trainer_pick": [(820, 222, YELLOW), (1483, 222, YELLOW), (2146, 222, YELLOW), (460, 1300, PINK),
                      (100, 1215, (14, 14, 14))],
@@ -522,6 +526,16 @@ def detect_screen(pic: np.ndarray) -> str:
     return "unknown"
 
 
+def is_stats_window(pic: np.ndarray) -> bool:
+    """The Stats window, scrolled or not: the pink title bar and the red close button, which do not scroll.
+
+    detect_screen also checks the first yellow header at y=270 and the scrollbar track at x=2300,
+    and both change once the window is scrolled (the header leaves, the yellow handle arrives).
+    """
+    pts = [SCREENS["stats"][0], (300, 140, PINK), (2253, 186, (189, 41, 74)), (2272, 155, (255, 255, 255))]
+    return all(_near(pic[y, x], colour, SCREEN_TOL) for x, y, colour in pts)
+
+
 # ---------------------------------------------------------- text regions ----
 
 def text_masks(pic: np.ndarray) -> dict[str, tuple[str, np.ndarray, dict]]:
@@ -800,7 +814,8 @@ def battle_slot(side: int, i: int) -> Box:
 CARD_SPRITE_DIR = ROOT / "templates" / "card_sprites"
 CARD_SPRITE_ROWS = (1186, 1290)     # the picture part of a shop card, above its badges
 CARD_SPRITES_PER_NAME = 3
-BATTLE_SPRITE_MAX = 45.0   # RMS colour difference over the sprite's own pixels
+BATTLE_SPRITE_MAX = 66.0       # RMS colour difference over the sprite's own pixels
+BATTLE_SPRITE_MAX_SURE = 50.0  # below this a smaller lead over the runner-up is enough
 BATTLE_SEARCH = 24         # sprites bob and sit a little differently; search this far around
 
 _battle_tpls: list[tuple[str, np.ndarray, np.ndarray]] | None = None
@@ -813,7 +828,9 @@ def card_sprite(pic: np.ndarray, i: int) -> tuple[np.ndarray, np.ndarray] | None
     r = pic[CARD_SPRITE_ROWS[0]:CARD_SPRITE_ROWS[1], x0 + 8:x1 - 8]
     outline = r.max(axis=2) < 70
     n, lab = cv2.connectedComponents((~outline).astype(np.uint8), connectivity=4)
-    edge = (set(lab[0]) | set(lab[:, 0]) | set(lab[:, -1])) - {0}
+    # Seed the panel from the side edges only: big sprites poke above and below these rows,
+    # and seeding from the top or bottom row would eat the sprite's inside and leave its outline.
+    edge = (set(lab[:, 0]) | set(lab[:, -1])) - {0}
     mask = ~(np.isin(lab, list(edge)) & ~outline)
     n, lab, st, _ = cv2.connectedComponentsWithStats(mask.astype(np.uint8), connectivity=8)
     if n < 2:
@@ -846,6 +863,8 @@ def learn_card_sprites(pic: np.ndarray, state: dict) -> list[Path]:
         if cs is None:
             continue
         rgb, mask = cs
+        if not _looks_like_sprite(rgb, mask):
+            continue
         if any(_same_sprite(rgb, mask, p) for p in have):
             continue
         k = 0
@@ -861,6 +880,15 @@ def learn_card_sprites(pic: np.ndarray, state: dict) -> list[Path]:
         global _battle_tpls
         _battle_tpls = None
     return saved
+
+
+def _looks_like_sprite(rgb: np.ndarray, mask: np.ndarray) -> bool:
+    """False for cut-outs that are not a whole monster: mostly black outline (the panel fill
+    leaked into the sprite) or pure grey (a greyed-out card), which would make bad templates."""
+    px = rgb[mask].astype(int)
+    if (px.max(axis=1) < 70).mean() > 0.75:      # dark monsters like Coalem reach ~0.57
+        return False
+    return int((px.max(axis=1) - px.min(axis=1)).max()) > 4
 
 
 def _same_sprite(rgb: np.ndarray, mask: np.ndarray, path: Path) -> bool:
@@ -911,9 +939,20 @@ def match_battle_sprite(pic: np.ndarray, box: Box, mirrored: bool) -> tuple[str 
         return None, 1e9
     ranked = sorted(by_name.items(), key=lambda kv: kv[1])
     best, best_d = ranked[0]
-    if best_d > BATTLE_SPRITE_MAX or (len(ranked) > 1 and best_d * 2 > ranked[1][1]):
+    second = ranked[1][1] if len(ranked) > 1 else 1e9
+    if not _battle_match_ok(best_d, second):
         return None, best_d
     return best, best_d
+
+
+def _battle_match_ok(best: float, second: float) -> bool:
+    """Accept a battle sprite match. Set by eye on 48 unnamed slots of 32 saved battles
+    (2026-11-13): every match at 50 or less was right; above that, the wrong ones (often
+    Aristobat or Stalagrove fitting nothing well) were within 1.22x of the runner-up, the right
+    ones mostly 1.3x or more ahead. Shiny monsters and attack effects land in the 40-65 range."""
+    if best <= BATTLE_SPRITE_MAX_SURE:
+        return second >= best * 1.15
+    return best <= BATTLE_SPRITE_MAX and second >= best * 1.3
 
 
 def _read_battle_slot(pic: np.ndarray, side: int, i: int, problems: list[str]) -> dict | None:
@@ -957,7 +996,11 @@ def read_battle(pic: np.ndarray) -> dict:
 # the window's edge until it is scrolled.
 
 STATS_LINE_COLOURS = {"dealt": (239, 66, 107), "inflicted": (123, 87, 161),
-                      "healed": (87, 138, 201), "triggered": (121, 174, 208)}
+                      "healed": (87, 138, 201), "triggered": (121, 174, 208),
+                      # each status has its own colour: purple Poison (read from the word),
+                      # yellow Shock and orange Burn; "Applied N shield" is brown
+                      "inflicted_shock": (231, 198, 28), "inflicted_burn": (237, 107, 58),
+                      "shielded": (164, 124, 65)}
 STATS_BORDER = (156, 156, 173)
 STATS_VIEW_Y = (250, 1318)       # the part of the window that shows cards (the rest is frame)
 STATS_CARD_TOP_GAP, STATS_CARD_H, STATS_ROW_PITCH = 19, 237, 260
@@ -1058,7 +1101,9 @@ def _stats_lines(rgb: np.ndarray, problems: list[str], where: str) -> dict:
         value = _to_int(digits)
         if value is None:
             problems.append(f"{where}: cannot read the number of a '{kind}' line ('{digits}')")
-        if kind == "inflicted":
+        if kind.startswith("inflicted_"):
+            out.setdefault("inflicted", {})[kind.split("_", 1)[1].title()] = value
+        elif kind == "inflicted":
             raw = "".join(store().classify("statsword", g.bitmap)[0] for g in words[2]) if len(words) > 2 else ""
             status = resolve(raw, KNOWN_STATUSES, ignore_case=True) or (raw if raw and "?" not in raw else None)
             if status is None:
@@ -1068,6 +1113,29 @@ def _stats_lines(rgb: np.ndarray, problems: list[str], where: str) -> dict:
         else:
             out[kind] = value
     return out
+
+
+def match_stats_sprite(rgb: np.ndarray) -> tuple[str | None, float]:
+    """Name the monster on a Stats window card. The picture there is the shop card's picture,
+    pixel for pixel, still and facing the same way (seen 2026-11-13: known monsters score 0,
+    the runner-up 70 or more), so this is far surer than reading the battle field."""
+    region = rgb.astype(np.float32)
+    by_name: dict[str, float] = {}
+    for name, t, k in _battle_templates():
+        if t.shape[0] > region.shape[0] or t.shape[1] > region.shape[1]:
+            continue
+        m3 = np.repeat(k[..., None], 3, axis=2).astype(np.float32)
+        res = cv2.matchTemplate(region, np.ascontiguousarray(t, dtype=np.float32), cv2.TM_SQDIFF, mask=m3)
+        d = float(np.sqrt(max(res.min(), 0.0) / m3.sum()))
+        by_name[name] = min(d, by_name.get(name, 1e9))
+    if not by_name:
+        return None, 1e9
+    ranked = sorted(by_name.items(), key=lambda kv: kv[1])
+    best, best_d = ranked[0]
+    second = ranked[1][1] if len(ranked) > 1 else 1e9
+    if not _battle_match_ok(best_d, second):
+        return None, best_d
+    return best, best_d
 
 
 def read_stats_window(pic: np.ndarray) -> dict:
@@ -1099,8 +1167,10 @@ def read_stats_window(pic: np.ndarray) -> dict:
                 present = bool((sprite.min(axis=2) < 215).mean() > 0.02)
                 where = f"stats header {h} row {row} col {col}"
                 lines = _stats_lines(card[:, STATS_SPRITE_W:], problems, where)
+                name, dist = match_stats_sprite(card[:, :STATS_SPRITE_W + 30]) if present else (None, None)
                 cells.append({"header": h, "headers": len(heads), "row": row, "col": col,
-                              "slot": row * 3 + col, "present": present or bool(lines), "lines": lines})
+                              "slot": row * 3 + col, "present": present or bool(lines), "lines": lines,
+                              "name": name, "sprite_distance": None if dist is None else round(dist, 1)})
     return {"cells": cells, "headers": len(heads), "problems": problems}
 
 
@@ -1115,9 +1185,12 @@ def read_stats(top_pic: np.ndarray, scrolled_pic: np.ndarray | None) -> dict:
     problems = list(a["problems"])
     my: list = [None] * 6
     opp: list = [None] * 6
+    my_names: list = [None] * 6
+    opp_names: list = [None] * 6
     for c in a["cells"]:
         if c["header"] == 0 and c["headers"] >= 1:
             my[c["slot"]] = c["lines"] if c["present"] else None
+            my_names[c["slot"]] = c.get("name")
     sources = [read_stats_window(scrolled_pic)] if scrolled_pic is not None else []
     sources.append(a)
     got = set()
@@ -1127,12 +1200,14 @@ def read_stats(top_pic: np.ndarray, scrolled_pic: np.ndarray | None) -> dict:
             last = c["header"] == c["headers"] - 1 and (c["headers"] >= 2 or src is not a)
             if last and c["slot"] not in got:
                 opp[c["slot"]] = c["lines"] if c["present"] else None
+                opp_names[c["slot"]] = c.get("name")
                 got.add(c["slot"])
         if len(got) == 6:
             break
     if len(got) < 6:
         problems.append(f"stats: opponent slots seen {sorted(got)} of 0-5 (scroll may have failed)")
-    return {"my_team": my, "opponent_team": opp, "problems": problems}
+    return {"my_team": my, "opponent_team": opp, "my_names": my_names, "opponent_names": opp_names,
+            "problems": problems}
 
 
 # End of battle: the HP bars on the (dimmed) result screen. The bar fills from the left.

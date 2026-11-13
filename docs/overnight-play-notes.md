@@ -54,9 +54,12 @@ below; see the end of the log.
 2. Event-only monsters are unknown to the simulator: Ignit (Burn 1, evolves on a victory into something
    unseen), Talonite, Wishwash, Cosmivore, Faebloom, Omnichrome (`data/special_monsters.csv`), Dryadell.
    Rhizuka (a foreign Rare from an event) is now in `data/foreign_monsters.csv` without its passive.
-3. The engine's "feed and sell" Bug move scored above keeping a strong Bug (Stingarde) on Day 2.
+3. The engine's "feed and sell" Bug move scored above keeping a strong Bug (Stingarde) on Day 2. Looked at
+   again on 2026-11-13: the simulator pool had it as a near tie (15% vs 12%), so it is left as it is.
 4. Opponent Shiny monsters in battle are not read as Shiny (battle matching uses plain sprites only).
-5. The Stats window does not find yellow "Inflicted N Shock" lines as text bands.
+5. ~~The Stats window does not find yellow "Inflicted N Shock" lines.~~ Done 2026-11-13: each status has
+   its own line colour (purple Poison, yellow Shock, orange Burn) and "Applied N shield" is brown; all are
+   read now.
 6. **OVERFLOW screen** (now handled: `reader.read_overflow`, `hands.resolve_overflow`, play.py sells the
    weakest named bench monster). An event monster that arrives with team and bench full sits in an
    "OVERFLOW" slot right of the team ("YOUR TEAM IS FULL. DRAG HERE TO SELL A MONSTER."); the team grid
@@ -64,6 +67,41 @@ below; see the end of the log.
    monster into the freed slot and the shop returns. Capture: `captures/stuck_20261112_211945.png`; probe
    colours: OVERFLOW header (255,189,8) at (1700,655), grey buttons (90,90,99) at (100,1215) and (2300,1215).
    Bot Run 3 (Chemist) stopped here on Day 9 with 4 badges and 1 life; the sale was done by hand.
+
+## Done on 2026-11-13 (after the night)
+- **Card sprites**: the shop-card cut-out was seeded from the top row, so a monster that pokes above the
+  card's picture rows lost its inside and only its outline was saved (or a greyed-out card was saved in
+  grey). Fixed, and outline-only or grey cut-outs are no longer saved. The 30 committed outline sprites
+  were kept: they still name their monster correctly in battle (Boomagon, Magmalith, Dracana, Shogapede).
+- **Stats window**: two wider shapes of the digit 3 taught (142 of 1228 lines in the saved captures read
+  '?'; now none). Shock, Burn and shield lines are read.
+- **Stats scroll never worked**: pyautogui on Windows sends `scroll(n)` as n raw wheel units, and a notch
+  is 120, so `scroll(-15)` was 1/8 of a notch. Every saved `stats_bottom` is the same as `stats_top`, so the
+  opponent's back row was never read. Now whole notches are sent. **Not yet checked in the game.**
+- **Battle names**: the sprite-match rule was too strict (needed 2x the runner-up's distance). Set by eye
+  on 48 cases: at 50 or less a 1.15x lead, up to 66 a 1.3x lead. Plain sprites match Shiny monsters at
+  40-65. Named slots in the 32 saved battles: 253 before, 294 after, no name changed.
+- `sim.from_logs` names my unnamed battle slots from the logged shop team (unique level + stats match).
+- Still the main reason logged battles cannot be checked against the simulator: unnamed opponents
+  (52 of 56 logged battles skipped; 24 of them are from before the battle screen was read at all).
+
+### Casual run on 2026-11-13 morning (Bug Catcher: 8 badges, out on day 13)
+Stops fixed on the way, each with a test:
+- Card font had no 7 (a Coupon took Mosslug to $7).
+- A monster bought for $0 (Bug Catcher's first Bug of the day) sells for $0: the sell check now accepts
+  unchanged money when one monster really left.
+- **Stats scroll now works.** Whole wheel notches reach the game; the scrolled picture was then thrown away
+  because the screen check looked at the first yellow header (scrolls away) and the scrollbar track (the
+  yellow handle arrives). `reader.is_stats_window` uses the title bar and close button. Days 6-13: all
+  12 slots read with no problems.
+- Gift box and trinket pick after an event are drawn over plain black, not the dimmed shop: both are now
+  recognised by their own pictures.
+- **Opponents are named from the Stats window.** Its pictures are the shop card pictures, pixel for pixel
+  (known monsters score 0, runner-up 70+). `read_stats` returns `my_names` / `opponent_names`;
+  `sim.from_logs` fills unnamed battle slots from them (older logs: read from the saved Stats pictures,
+  cached in logs/stats_names_cache.json). Slot numbers agree with the battle screen: 304 of 304.
+  Logged battles the simulator can check went from 4 to 12 (agrees on 11). Older logs still miss the
+  opponent's back row (no scrolled picture); new runs will not.
 
 Done later in the night: Purple Egg named on team/bench (kept out of battle matching), Mirror / Glimmer /
 Legendary Potions modelled, and `Params.grow_next` (tomorrow is scored with one battle's permanent growth).

@@ -44,6 +44,61 @@ def _slot(s: dict | None) -> dict | None:
     return out
 
 
+def _name_from_team(slots: list, team: list | None) -> None:
+    """Name my unnamed battle slots from the shop team logged with the battle: the one team monster
+    with the same level, stats and Multicast (the battle grid is laid out differently from the shop
+    grid, so slots are matched by numbers, not position). Left unnamed when it is not unique."""
+    known = [x for x in (_slot(t) for t in (team or [])) if x and x["name"]]
+    for s in slots:
+        if s and not s["name"]:
+            same = {k["name"] for k in known if k["level"] == s["level"] and k["stats"] == s["stats"]
+                    and k.get("multicast") == s.get("multicast")}
+            if len(same) == 1:
+                s["name"] = same.pop()
+
+
+NAMES_CACHE = LOG_DIR / "stats_names_cache.json"
+_names_cache: dict | None = None
+
+
+def _stats_names(rec: dict) -> tuple[list, list]:
+    """(my names, opponent names) from the Stats window pictures: logged by play.py since
+    2026-11-13, otherwise read from the saved captures (cached in logs/stats_names_cache.json)."""
+    if "opponent_names" in rec:
+        return rec.get("my_names") or [None] * 6, rec.get("opponent_names") or [None] * 6
+    caps = [c for c in (rec.get("captures") or []) if (ROOT / c).exists()]
+    if not caps:
+        return [None] * 6, [None] * 6
+    global _names_cache
+    if _names_cache is None:
+        _names_cache = json.loads(NAMES_CACHE.read_text(encoding="utf-8")) if NAMES_CACHE.exists() else {}
+    key = "|".join(caps)
+    if key not in _names_cache:
+        import numpy as np
+        from PIL import Image
+        sys.path.insert(0, str(ROOT))
+        import reader
+        import window
+        canon = lambda c: np.asarray(window.canonical_picture(Image.open(ROOT / c)))
+        st = reader.read_stats(canon(caps[0]), canon(caps[1]) if len(caps) > 1 else None)
+        _names_cache[key] = [st["my_names"], st["opponent_names"]]
+        NAMES_CACHE.write_text(json.dumps(_names_cache), encoding="utf-8")
+    mine, theirs = _names_cache[key]
+    return mine, theirs
+
+
+def _name_from_stats(case: dict, names_a: list, names_b: list) -> None:
+    """Fill unnamed battle slots from the Stats window, whose slots are numbered the same way
+    (checked 2026-11-13: 304 slots named by both, all the same) and whose pictures are surer."""
+    for side, names, label in (("a", names_a, "my"), ("b", names_b, "opponent")):
+        for i, s in enumerate(case[side]["slots"]):
+            if s and not s["name"] and i < len(names) and names[i]:
+                s["name"] = names[i]
+                msg = f"{label} slot {i + 1} not named"
+                if msg in case["problems"]:
+                    case["problems"].remove(msg)
+
+
 def battles_from_log(path: Path) -> list[dict]:
     """One case per logged battle: {"a", "b", "day", "result", "problems", "source"}."""
     records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -63,6 +118,7 @@ def battles_from_log(path: Path) -> list[dict]:
             problems = list(seen.get("problems", []))
             mine = [_slot(s) for s in seen.get("my_team", [])] or [None] * 6
             theirs = [_slot(s) for s in seen.get("opponent_team", [])] or [None] * 6
+            _name_from_team(mine, rec.get("team"))
             if not seen:
                 problems.append("battle screen not read")
             for side, team in (("my", mine), ("opponent", theirs)):
@@ -85,6 +141,7 @@ def battles_from_log(path: Path) -> list[dict]:
             }
             cases.append(open_case)
         elif kind == "battle_stats" and open_case is not None:
+            _name_from_stats(open_case, *_stats_names(rec))
             open_case["stats"] = {"my_team": rec.get("my_team"), "opponent_team": rec.get("opponent_team"),
                                   "end_hp_fraction": rec.get("end_hp_fraction"),
                                   "problems": rec.get("problems", [])}

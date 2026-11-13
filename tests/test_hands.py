@@ -59,8 +59,11 @@ class Checks(unittest.TestCase):
 
     def test_sell(self):
         s = copy.deepcopy(BEFORE)
+        moved = copy.deepcopy(BEFORE)                   # dragged onto the bench, not sold
+        moved["bench"][moved["bench"].index(None)], moved["team"][5] = moved["team"][5], None
+        self.assertIn("money", hands.check_sell(BEFORE, moved, ("team", 5)))
         s["team"][5] = None
-        self.assertIn("money", hands.check_sell(BEFORE, s, ("team", 5)))
+        self.assertIsNone(hands.check_sell(BEFORE, s, ("team", 5)))   # a $0 monster sells for $0
         s["money"] += 5
         self.assertIsNone(hands.check_sell(BEFORE, s, ("team", 5)))
 

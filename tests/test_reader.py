@@ -106,6 +106,8 @@ class ScreenDetection(unittest.TestCase):
         "new_run_ranked_selected.png": "new_run",
         "trainer_pick.png": "trainer_pick",
         "gift_box.png": "gift_box",
+        "gift_box_after_event.png": "gift_box",
+        "trinket_pick_after_event.png": "trinket_pick",
         "trinket_pick.png": "trinket_pick",
         "shop_day1_broke.png": "shop",          # REROLL button is grey here ($0)
     }
@@ -227,6 +229,27 @@ class CardSprites(unittest.TestCase):
                 rgb, mask = got
                 self.assertGreater(mask.mean(), 0.2, card["name"])
 
+    def test_tall_sprite_keeps_its_inside(self):
+        # Electranade's fuse pokes above the sprite rows; the panel fill used to eat its body
+        name = "unread_20261112_210439_659871.png"
+        pic = _canonical(name)
+        if pic is None:
+            self.skipTest(f"captures/{name} not here")
+        rgb, mask = reader.card_sprite(pic, 0)
+        self.assertTrue(reader._looks_like_sprite(rgb, mask))
+        self.assertLess((rgb[mask].max(axis=1) < 70).mean(), 0.5)
+
+    def test_outline_and_grey_cutouts_are_not_learned(self):
+        import numpy as np
+        mask = np.ones((20, 20), bool)
+        outline = np.zeros((20, 20, 3), np.uint8)
+        grey = np.full((20, 20, 3), 128, np.uint8)
+        colour = grey.copy()
+        colour[..., 0] = 200
+        self.assertFalse(reader._looks_like_sprite(outline, mask))
+        self.assertFalse(reader._looks_like_sprite(grey, mask))
+        self.assertTrue(reader._looks_like_sprite(colour, mask))
+
 
 if __name__ == "__main__":
     unittest.main()
@@ -279,3 +302,15 @@ class OverflowScreen(unittest.TestCase):
         self.assertEqual([b["name"] for b in st["bench"]], ["Cicadence", "Cicadence", "Frizzly", "Frizzly"])
         self.assertEqual(st["overflow"]["level"], 1)
         self.assertEqual(st["problems"], [])
+
+
+class CardSeven(unittest.TestCase):
+    def test_coupon_price_seven_is_read(self):
+        # a Coupon took Mosslug to $7; the card font had no 7 until 2026-11-13
+        p = Path(__file__).resolve().parent.parent / "captures" / "unread_20261113_084204_238777.png"
+        if not p.exists():
+            self.skipTest("capture not here")
+        st = reader.read_state(Image.open(p))
+        self.assertEqual(st["problems"], [])
+        self.assertEqual([s["price"] for s in st["shop"]], [0, 12, 7, 12, 15])
+

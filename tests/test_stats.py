@@ -30,6 +30,17 @@ class StatsWindow(unittest.TestCase):
         self.assertEqual(by[(0, 4)]["lines"], {"dealt": 75, "healed": 90, "triggered": 3})
         self.assertEqual(by[(1, 0)]["lines"], {"dealt": 1, "triggered": 1})
 
+    def test_shock_burn_shield_lines_and_wide_threes(self):
+        # yellow Shock, orange Burn and brown "Applied N shield" lines; the wide 3 of "Triggered 3"
+        name = "battles/20261112_132653_stats_top.png"
+        if not (ROOT / "captures" / name).exists():
+            self.skipTest(f"captures/{name} not here")
+        r = reader.read_stats_window(pic(name))
+        self.assertEqual(r["problems"], [])
+        by = {(c["header"], c["slot"]): c["lines"] for c in r["cells"]}
+        self.assertEqual(by[(0, 4)], {"dealt": 75, "inflicted": {"Shock": 10}, "triggered": 10})
+        self.assertEqual(by[(1, 1)], {"shielded": 200, "inflicted": {"Burn": 20}, "triggered": 5})
+
     def test_unscrolled_window_reports_the_missing_opponent_row(self):
         r = reader.read_stats(pic("stats_day2.png"), None)
         self.assertEqual(r["my_team"][0], {"dealt": 150, "triggered": 3})
@@ -86,3 +97,60 @@ class LogsWithStats(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LoggedTeamNames(unittest.TestCase):
+    def test_unnamed_battle_slot_takes_the_unique_team_match(self):
+        badge = lambda stat, v: {"stat": stat, "value": v}
+        team = [{"name": "Reapra", "level": 1, "stats": [badge("damage", 120)]},
+                {"name": "Spinarai", "level": 2, "stats": [badge("damage", 6), badge("poison", 11)]},
+                {"name": "Joltail", "level": 1, "stats": [badge("damage", 30)]},
+                {"name": "Ironcore", "level": 1, "stats": [badge("damage", 30)]}]
+        slots = [from_logs._slot({"name": None, "level": 1, "stats": [badge("damage", 120)]}),
+                 from_logs._slot({"name": None, "level": 1, "stats": [badge("damage", 30)]})]
+        from_logs._name_from_team(slots, team)
+        self.assertEqual(slots[0]["name"], "Reapra")
+        self.assertIsNone(slots[1]["name"])          # Joltail or Ironcore: not unique
+
+
+class BattleSpriteRule(unittest.TestCase):
+    def test_acceptance(self):
+        self.assertTrue(reader._battle_match_ok(42, 49))      # Bumblebolt, seen right
+        self.assertTrue(reader._battle_match_ok(63, 82))      # Spinarai with an effect on it
+        self.assertFalse(reader._battle_match_ok(60, 73))     # Aristobat on a Shiny monster: wrong
+        self.assertFalse(reader._battle_match_ok(70, 140))    # too far from anything
+
+
+class ScrolledStats(unittest.TestCase):
+    def test_scrolled_window_gives_all_six_opponents(self):
+        # the first real scrolled picture: the yellow scroll handle covers the old frame point
+        top, bottom = "battles/20261113_085236_stats_top.png", "battles/20261113_085236_stats_bottom.png"
+        if not (ROOT / "captures" / bottom).exists():
+            self.skipTest("captures not here")
+        a, b = pic(top), pic(bottom)
+        self.assertTrue(reader.is_stats_window(b))
+        r = reader.read_stats(a, b)
+        self.assertEqual(r["problems"], [])
+        self.assertEqual(r["opponent_team"][3], {"inflicted": {"Poison": 6}, "triggered": 6})
+        self.assertEqual(r["opponent_team"][4], {"healed": 140, "inflicted": {"Poison": 161}, "triggered": 14})
+
+
+class StatsNames(unittest.TestCase):
+    def test_both_teams_are_named_from_the_stats_cards(self):
+        top, bottom = "battles/20261113_085236_stats_top.png", "battles/20261113_085236_stats_bottom.png"
+        if not (ROOT / "captures" / bottom).exists():
+            self.skipTest("captures not here")
+        r = reader.read_stats(pic(top), pic(bottom))
+        self.assertEqual(r["my_names"], ["Ironcore", "Bumblebolt", "Runerock", "Frizzly", "Venopuff", "Velocect"])
+        self.assertEqual(r["opponent_names"], ["Spinarai", "Puffloon", "Shogapede", "Noxnimbus", "Puffloon", "Venopuff"])
+
+    def test_unnamed_battle_slots_take_the_stats_names(self):
+        case = {"a": {"slots": [from_logs._slot({"name": None, "level": 1, "stats": []}), None]},
+                "b": {"slots": [from_logs._slot({"name": "Spinarai", "level": 1, "stats": []}),
+                                from_logs._slot({"name": None, "level": 2, "stats": []})]},
+                "problems": ["my slot 1 not named", "opponent slot 2 not named"]}
+        from_logs._name_from_stats(case, ["Ironcore", None], ["Puffloon", "Puffloon"])
+        self.assertEqual(case["a"]["slots"][0]["name"], "Ironcore")
+        self.assertEqual(case["b"]["slots"][0]["name"], "Spinarai")     # a battle name is kept
+        self.assertEqual(case["b"]["slots"][1]["name"], "Puffloon")
+        self.assertEqual(case["problems"], [])
