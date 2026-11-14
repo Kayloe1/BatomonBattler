@@ -133,7 +133,7 @@ def act(h, a):
 # the wait at the top of the loop accepts them all.
 AFTER_WAIT = {"shop", "result", "event", "gift_box", "trinket_pick", "trainer_pick", "select_target",
               "overflow", "cash_in", "run_over", "new_run", "main_menu", "main_menu_continue",
-              "continue_confirm", "title"}
+              "continue_confirm", "title", "stats"}
 
 LAST_LOG = None          # path of the log of the latest main() call (batch.py reads it)
 
@@ -456,6 +456,12 @@ def main(argv=None, control: Control | None = None, hands=None, brain=None) -> i
             log("confirm", ok=r.ok, message=r.message)
             if not r.ok:
                 return stop(f"after CONFIRM: {r.message} (capture: {(r.after or {}).get('saved_capture')})", r.after)
+        elif screen == "stats":
+            # a Stats window left open by an earlier session that stopped: close it, the result box follows
+            r = h.close_stats()
+            log("close_stats", ok=r.ok, message=r.message)
+            if not r.ok:
+                return stop(f"the Stats window did not close: {r.message}", r.after)
         elif screen == "overflow":
             # an event gave a monster with team and bench full: sell the weakest named bench monster,
             # or the newcomer when nothing on the bench may be sold (unnamed monsters are never sold)
