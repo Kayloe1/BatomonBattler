@@ -115,3 +115,39 @@ class ClickTargets(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CoveredGame(unittest.TestCase):
+    """A window kept on top over the game must not receive the bot's clicks (2026-11-13)."""
+
+    def hands_with(self, cover):
+        import types
+        h = hands.Hands.__new__(hands.Hands)
+        h.dry_run, h.hwnd = False, 1
+        h._focus = lambda: None
+        h.screen_point = lambda box: (100, 200) if box is not hands.PARK else (5, 5)
+        h._covering = lambda x, y: cover
+        sent = []
+        fake = types.SimpleNamespace(moveTo=lambda *a, **k: sent.append("move"),
+                                     mouseDown=lambda *a, **k: sent.append("down"),
+                                     mouseUp=lambda *a, **k: sent.append("up"),
+                                     scroll=lambda *a, **k: sent.append("scroll"))
+        old = sys.modules.get("pyautogui")
+        sys.modules["pyautogui"] = fake
+        self.addCleanup(lambda: sys.modules.__setitem__("pyautogui", old) if old else sys.modules.pop("pyautogui"))
+        return h, sent
+
+    def test_nothing_is_sent_where_another_window_covers_the_game(self):
+        h, sent = self.hands_with("Claude")
+        for act in (lambda: h._click(reader.STATS_CLOSE),
+                    lambda: h._drag(reader.team_slot(0), reader.SELL_BAR),
+                    lambda: h._scroll(reader.STATS_SCROLL_POINT, -3)):
+            with self.assertRaises(RuntimeError) as e:
+                act()
+            self.assertIn("'Claude' covers the game", str(e.exception))
+        self.assertEqual(sent, [])
+
+    def test_a_visible_game_is_clicked(self):
+        h, sent = self.hands_with(None)
+        h._click(reader.STATS_CLOSE)
+        self.assertEqual(sent[:3], ["move", "down", "up"])

@@ -83,10 +83,13 @@ def play_run(seed: int, policy: str, params: Params | None = None, pool_n: int =
              verbose: bool = False) -> dict:
     rng = random.Random(seed)          # shops and gifts: identical for both policies
     shop_rng = random.Random(seed * 7 + 1)
-    fight_pools = opponents.pools(n=48, seed=9001)        # who we really meet
+    # ghosts only in both pools: the recorded real teams would sit at the front of both, and the
+    # engine would be graded on the opponents it planned against
+    fight_pools = opponents.pools(n=48, seed=9001, recorded=False)        # who we really meet
     planner = None
     if policy == "engine":
-        planner = Planner(Evaluator(opponents.pools(n=pool_n, seed=1)), params or Params(), seed=seed)
+        planner = Planner(Evaluator(opponents.pools(n=pool_n, seed=1, recorded=False)), params or Params(),
+                          seed=seed)
     s = RunState(day=1, money=0, rank=1)
     history = []
     log: list[str] = []

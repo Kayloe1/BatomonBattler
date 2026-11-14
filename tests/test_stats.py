@@ -189,3 +189,10 @@ class WonRunLabel(unittest.TestCase):
         self.assertEqual(log(9, 7), "win")
         self.assertEqual(log(4, 1), "loss")
         self.assertIsNone(log(9, 1))            # one badge short on the last life: either
+
+
+class ScrolledStatsScreen(unittest.TestCase):
+    def test_a_scrolled_stats_window_is_the_stats_screen(self):
+        for name in ("battles/20261113_085927_stats_bottom.png", "unread_20261113_201825_127428.png"):
+            if (ROOT / "captures" / name).exists():
+                self.assertEqual(reader.detect_screen(pic(name)), "stats", name)

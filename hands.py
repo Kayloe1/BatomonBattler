@@ -201,11 +201,35 @@ class Hands:
         if win32gui.GetForegroundWindow() != self.hwnd:
             raise RuntimeError("could not bring the game window to the front; click on the game once and retry")
 
+    def _covering(self, x: int, y: int) -> str | None:
+        """None when the screen point (x, y) shows the game window, else the title of the window
+        that covers it there."""
+        import win32gui
+        top = win32gui.WindowFromPoint((x, y))
+        root = win32gui.GetAncestor(top, 2) if top else 0          # GA_ROOT: the top-level window
+        if root == self.hwnd:
+            return None
+        return win32gui.GetWindowText(root) or "another window"
+
+    def _ensure_visible(self, *points: tuple[int, int]) -> None:
+        """Refuse to send input where another window covers the game.
+
+        Mouse input goes to whatever window is on top at that point. Bringing the game to the front
+        is not enough when a window is kept always on top (2026-11-13: the Claude app covered the
+        Stats window's close button, and the click landed on Claude). Nothing is clicked then."""
+        for x, y in points:
+            cover = self._covering(x, y)
+            if cover is not None:
+                raise RuntimeError(
+                    f"The window '{cover}' covers the game where the bot has to click. Nothing was clicked. "
+                    f"Move it off the game picture (or stop it staying on top), then press Start again.")
+
     def _click(self, box: reader.Box) -> list:
         x, y = self.screen_point(box)
         if not self.dry_run:
             import pyautogui
             self._focus()
+            self._ensure_visible((x, y))
             pyautogui.moveTo(x, y, duration=0.15)
             pyautogui.mouseDown()
             time.sleep(0.06)
@@ -223,6 +247,7 @@ class Hands:
             return None
         import pyautogui
         self._focus()
+        self._ensure_visible(self.screen_point(box))
         pyautogui.moveTo(*self.screen_point(box), duration=0.15)
         time.sleep(0.8)
         self.look(save_if_unreadable=False)
@@ -244,6 +269,7 @@ class Hands:
         if not self.dry_run:
             import pyautogui
             self._focus()
+            self._ensure_visible((x0, y0), (x1, y1))
             pyautogui.moveTo(x0, y0, duration=0.15)
             pyautogui.mouseDown()
             time.sleep(0.12)
@@ -259,6 +285,7 @@ class Hands:
         if not self.dry_run:
             import pyautogui
             self._focus()
+            self._ensure_visible((x, y))
             pyautogui.moveTo(x, y, duration=0.15)
             # pyautogui on Windows passes the number straight to mouse_event as wheel units,
             # and one wheel notch is 120 units: scroll(-15) was 1/8 of a notch and the game
@@ -539,6 +566,10 @@ class Hands:
             out["stuck"] = True
             out["problems"].append(f"stats: window did not close ({after.get('screen')})")
         return out
+
+    def close_stats(self) -> Result:
+        """Close a Stats window left open (an earlier session stopped while it showed)."""
+        return self._press_and_wait("close stats", "stats", reader.STATS_CLOSE, {"result"}, 10)
 
     def confirm_result(self) -> Result:
         """Press CONFIRM on the result box; the next shop, an event or the end of the run follows."""

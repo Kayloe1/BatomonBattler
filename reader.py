@@ -530,6 +530,8 @@ def detect_screen(pic: np.ndarray) -> str:
     for name, points in SCREENS.items():
         if all(_near(pic[y, x], colour, SCREEN_TOL) for x, y, colour in points):
             return name
+    if is_stats_window(pic):
+        return "stats"                    # scrolled: its header and scrollbar look different
     return "unknown"
 
 
